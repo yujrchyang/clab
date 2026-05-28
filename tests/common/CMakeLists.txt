@@ -24,6 +24,14 @@ target_link_libraries(test_valgrind
 )
 add_test(NAME test_valgrind COMMAND test_valgrind)
 
+add_executable(test_intarith test_intarith.cc)
+target_include_directories(test_intarith PRIVATE ${PROJECT_SOURCE_DIR})
+target_link_libraries(test_intarith
+    PRIVATE
+        GTest::gtest_main
+)
+add_test(NAME test_intarith COMMAND test_intarith)
+
 add_executable(test_inline_memory test_inline_memory.cc)
 target_include_directories(test_inline_memory PRIVATE ${PROJECT_SOURCE_DIR})
 target_link_libraries(test_inline_memory
