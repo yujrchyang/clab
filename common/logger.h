@@ -1,5 +1,5 @@
-#ifndef COMMON_LOGGER_HPP
-#define COMMON_LOGGER_HPP
+#ifndef COMMON_LOGGER_H
+#define COMMON_LOGGER_H
 
 #include <filesystem>
 #include <memory>
@@ -78,4 +78,4 @@ struct fmt::formatter<TOPNSPC::logger_internal::DefaultModule> : fmt::formatter<
 #define MOD_WARN(logger, fmt, ...) MOD_PRINT_ACTIVE(logger, warn, fmt, ##__VA_ARGS__)
 #define MOD_ERROR(logger, fmt, ...) MOD_PRINT_ACTIVE(logger, error, fmt, ##__VA_ARGS__)
 
-#endif  // COMMON_LOGGER_HPP
+#endif  // COMMON_LOGGER_H

@@ -3,7 +3,7 @@
 #include <filesystem>
 #include <string>
 
-#include "common/logger.hpp"
+#include "common/logger.h"
 
 TEST(LoggerTest, DefaultConstruction) {
     clab::Logger logger;

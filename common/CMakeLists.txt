@@ -1,6 +1,6 @@
 add_library(common SHARED
-    logger.cpp
-    spinlock.cpp
+    logger.cc
+    spinlock.cc
 )
 target_include_directories(common PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}

@@ -4,7 +4,7 @@
 #include <thread>
 #include <vector>
 
-#include "common/spinlock.hpp"
+#include "common/spinlock.h"
 
 using clab::spinlock;
 

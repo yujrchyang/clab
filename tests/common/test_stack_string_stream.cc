@@ -4,7 +4,7 @@
 #include <sstream>
 #include <string>
 
-#include "common/stack_string_stream.hpp"
+#include "common/stack_string_stream.h"
 
 using clab::CachedStackStringStream;
 using clab::StackStringBuf;

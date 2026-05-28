@@ -1,5 +1,5 @@
-#ifndef COMMON_SPINLOCK_HPP
-#define COMMON_SPINLOCK_HPP
+#ifndef COMMON_SPINLOCK_H
+#define COMMON_SPINLOCK_H
 
 #include <atomic>
 
@@ -19,4 +19,4 @@ private:
 
 }  // namespace TOPNSPC
 
-#endif  // COMMON_SPINLOCK_HPP
+#endif  // COMMON_SPINLOCK_H

@@ -1,6 +1,6 @@
-#ifndef COMMON_FWD_HPP
-#define COMMON_FWD_HPP
+#ifndef COMMON_FWD_H
+#define COMMON_FWD_H
 
 #define TOPNSPC clab
 
-#endif  // COMMON_FWD_HPP
+#endif  // COMMON_FWD_H

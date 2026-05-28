@@ -1,5 +1,5 @@
-#ifndef COMMON_STACKSTRINGSTREAM_HPP
-#define COMMON_STACKSTRINGSTREAM_HPP
+#ifndef COMMON_STACKSTRINGSTREAM_H
+#define COMMON_STACKSTRINGSTREAM_H
 
 #include <boost/container/small_vector.hpp>
 
@@ -172,4 +172,4 @@ private:
 
 }  // namespace TOPNSPC
 
-#endif  // COMMON_STACKSTRINGSTREAM_HPP
+#endif  // COMMON_STACKSTRINGSTREAM_H

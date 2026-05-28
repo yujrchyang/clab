@@ -1,4 +1,4 @@
-#include "spinlock.hpp"
+#include "spinlock.h"
 
 namespace TOPNSPC {
 
