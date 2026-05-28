@@ -57,6 +57,15 @@ target_link_libraries(test_safe_io
 )
 add_test(NAME test_safe_io COMMAND test_safe_io)
 
+add_executable(test_error test_error.cc)
+target_include_directories(test_error PRIVATE ${PROJECT_SOURCE_DIR})
+target_link_libraries(test_error
+    PRIVATE
+        common
+        GTest::gtest_main
+)
+add_test(NAME test_error COMMAND test_error)
+
 add_executable(test_scope_guard test_scope_guard.cc)
 target_include_directories(test_scope_guard PRIVATE ${PROJECT_SOURCE_DIR})
 target_link_libraries(test_scope_guard

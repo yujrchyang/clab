@@ -1,4 +1,5 @@
 add_library(common SHARED
+    error.cc
     logger.cc
     safe_io.cc
     spinlock.cc
