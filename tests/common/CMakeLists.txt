@@ -125,3 +125,12 @@ target_link_libraries(test_armor
         GTest::gtest_main
 )
 add_test(NAME test_armor COMMAND test_armor)
+
+add_executable(test_buffer test_buffer.cc)
+target_include_directories(test_buffer PRIVATE ${PROJECT_SOURCE_DIR})
+target_link_libraries(test_buffer
+    PRIVATE
+        common
+        GTest::gtest_main
+)
+add_test(NAME test_buffer COMMAND test_buffer)

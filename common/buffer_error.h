@@ -1,23 +1,21 @@
 #ifndef COMMON_BUFFER_ERROR_H
 #define COMMON_BUFFER_ERROR_H
 
-#include <exception>
+#include <stdexcept>
 
 #include "common_fwd.h"
 
 namespace TOPNSPC::buffer {
 
-struct end_of_buffer : std::exception {};
+struct error : std::runtime_error {
+    using runtime_error::runtime_error;
+    error() : runtime_error("buffer::error") {}
+};
 
-struct malformed_input : std::exception {
-    explicit malformed_input(const char* msg) noexcept
-        : msg_(msg) {}
-    const char* what() const noexcept override {
-        return msg_;
-    }
+struct end_of_buffer : error {};
 
-private:
-    const char* msg_;
+struct malformed_input : error {
+    using error::error;
 };
 
 }  // namespace TOPNSPC::buffer
