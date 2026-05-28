@@ -57,6 +57,14 @@ target_link_libraries(test_safe_io
 )
 add_test(NAME test_safe_io COMMAND test_safe_io)
 
+add_executable(test_buffer_error test_buffer_error.cc)
+target_include_directories(test_buffer_error PRIVATE ${PROJECT_SOURCE_DIR})
+target_link_libraries(test_buffer_error
+    PRIVATE
+        GTest::gtest_main
+)
+add_test(NAME test_buffer_error COMMAND test_buffer_error)
+
 add_executable(test_error test_error.cc)
 target_include_directories(test_error PRIVATE ${PROJECT_SOURCE_DIR})
 target_link_libraries(test_error
