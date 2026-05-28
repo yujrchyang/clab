@@ -66,4 +66,3 @@ set_target_properties(isal PROPERTIES
 
 # Expose global variable to mark availability
 set(HAVE_ISA_L TRUE CACHE INTERNAL "")
-add_compile_definitions(HAVE_ISA_L=1)

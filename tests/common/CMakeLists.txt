@@ -98,3 +98,12 @@ target_link_libraries(test_deleter
         GTest::gtest_main
 )
 add_test(NAME test_deleter COMMAND test_deleter)
+
+add_executable(test_crc32 test_crc32.cc)
+target_include_directories(test_crc32 PRIVATE ${PROJECT_SOURCE_DIR})
+target_link_libraries(test_crc32
+    PRIVATE
+        common
+        GTest::gtest_main
+)
+add_test(NAME test_crc32 COMMAND test_crc32)

@@ -1,4 +1,5 @@
 add_library(common SHARED
+    crc32.cc
     error.cc
     logger.cc
     safe_io.cc
@@ -10,6 +11,7 @@ target_include_directories(common PUBLIC
 )
 target_link_libraries(common PUBLIC
     Boost::boost
+    isal
 )
 target_link_libraries(common PRIVATE
     -Wl,--whole-archive
@@ -18,3 +20,4 @@ target_link_libraries(common PRIVATE
     fmt::fmt
     pthread
 )
+target_compile_definitions(common PUBLIC HAVE_ISA_L=1)
