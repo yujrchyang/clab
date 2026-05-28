@@ -1,3 +1,11 @@
+add_executable(test_page test_page.cc)
+target_include_directories(test_page PRIVATE ${PROJECT_SOURCE_DIR})
+target_link_libraries(test_page
+    PRIVATE
+        GTest::gtest_main
+)
+add_test(NAME test_page COMMAND test_page)
+
 add_executable(test_logger test_logger.cc)
 target_include_directories(test_logger PRIVATE ${PROJECT_SOURCE_DIR})
 target_link_libraries(test_logger
