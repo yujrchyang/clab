@@ -33,3 +33,4 @@ option(TEST "Build and run tests" ON)
 # --- Third-party libraries (Git Submodules) ---
 include(BuildGoogleTest)
 include(BuildSpdlog)
+include(BuildISAL)
