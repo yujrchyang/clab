@@ -29,8 +29,14 @@ enable_testing()
 # --- Build options: -DTEST=ON/OFF controls test compilation ---
 enable_testing()
 option(TEST "Build and run tests" ON)
+if(TEST)
+    add_subdirectory(tests)
+endif()
 
 # --- Third-party libraries (Git Submodules) ---
 include(BuildGoogleTest)
 include(BuildSpdlog)
 include(BuildISAL)
+
+# --- Common library ---
+add_subdirectory(common)
