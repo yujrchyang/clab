@@ -90,3 +90,11 @@ target_link_libraries(test_spinlock
         GTest::gtest_main
 )
 add_test(NAME test_spinlock COMMAND test_spinlock)
+
+add_executable(test_deleter test_deleter.cc)
+target_include_directories(test_deleter PRIVATE ${PROJECT_SOURCE_DIR})
+target_link_libraries(test_deleter
+    PRIVATE
+        GTest::gtest_main
+)
+add_test(NAME test_deleter COMMAND test_deleter)
