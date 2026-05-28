@@ -9,3 +9,11 @@ target_link_libraries(test_logger
         GTest::gtest_main
 )
 add_test(NAME test_logger COMMAND test_logger)
+
+add_executable(test_valgrind test_valgrind.cpp)
+target_include_directories(test_valgrind PRIVATE ${PROJECT_SOURCE_DIR})
+target_link_libraries(test_valgrind
+    PRIVATE
+        GTest::gtest_main
+)
+add_test(NAME test_valgrind COMMAND test_valgrind)
