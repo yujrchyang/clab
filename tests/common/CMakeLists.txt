@@ -32,6 +32,14 @@ target_link_libraries(test_stack_string_stream
 )
 add_test(NAME test_stack_string_stream COMMAND test_stack_string_stream)
 
+add_executable(test_scope_guard test_scope_guard.cc)
+target_include_directories(test_scope_guard PRIVATE ${PROJECT_SOURCE_DIR})
+target_link_libraries(test_scope_guard
+    PRIVATE
+        GTest::gtest_main
+)
+add_test(NAME test_scope_guard COMMAND test_scope_guard)
+
 add_executable(test_spinlock test_spinlock.cc)
 target_include_directories(test_spinlock PRIVATE ${PROJECT_SOURCE_DIR})
 target_link_libraries(test_spinlock
