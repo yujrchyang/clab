@@ -31,3 +31,12 @@ target_link_libraries(test_stack_string_stream
         GTest::gtest_main
 )
 add_test(NAME test_stack_string_stream COMMAND test_stack_string_stream)
+
+add_executable(test_spinlock test_spinlock.cpp)
+target_include_directories(test_spinlock PRIVATE ${PROJECT_SOURCE_DIR})
+target_link_libraries(test_spinlock
+    PRIVATE
+        common
+        GTest::gtest_main
+)
+add_test(NAME test_spinlock COMMAND test_spinlock)
