@@ -1,4 +1,5 @@
 add_library(common SHARED
+    cpu.cc
     crc32.cc
     error.cc
     logger.cc

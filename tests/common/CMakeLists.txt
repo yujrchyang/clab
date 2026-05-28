@@ -107,3 +107,12 @@ target_link_libraries(test_crc32
         GTest::gtest_main
 )
 add_test(NAME test_crc32 COMMAND test_crc32)
+
+add_executable(test_cpu test_cpu.cc)
+target_include_directories(test_cpu PRIVATE ${PROJECT_SOURCE_DIR})
+target_link_libraries(test_cpu
+    PRIVATE
+        common
+        GTest::gtest_main
+)
+add_test(NAME test_cpu COMMAND test_cpu)
