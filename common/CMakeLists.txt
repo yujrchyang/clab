@@ -1,4 +1,5 @@
 add_library(common SHARED
+    armor.cc
     cpu.cc
     crc32.cc
     error.cc

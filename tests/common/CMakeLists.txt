@@ -116,3 +116,12 @@ target_link_libraries(test_cpu
         GTest::gtest_main
 )
 add_test(NAME test_cpu COMMAND test_cpu)
+
+add_executable(test_armor test_armor.cc)
+target_include_directories(test_armor PRIVATE ${PROJECT_SOURCE_DIR})
+target_link_libraries(test_armor
+    PRIVATE
+        common
+        GTest::gtest_main
+)
+add_test(NAME test_armor COMMAND test_armor)
