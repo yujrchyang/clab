@@ -65,6 +65,27 @@ TEST(SpinlockTest, StressTest) {
     EXPECT_EQ(counter, static_cast<long long>(per_thread) * num_threads);
 }
 
+TEST(SpinlockTest, TryLockSucceedsWhenUncontended) {
+    spinlock lock;
+    EXPECT_TRUE(lock.try_lock());
+    lock.unlock();
+}
+
+TEST(SpinlockTest, TryLockFailsWhenLocked) {
+    spinlock lock;
+    lock.lock();
+    EXPECT_FALSE(lock.try_lock());
+    lock.unlock();
+}
+
+TEST(SpinlockTest, TryLockAfterUnlock) {
+    spinlock lock;
+    EXPECT_TRUE(lock.try_lock());
+    lock.unlock();
+    EXPECT_TRUE(lock.try_lock());
+    lock.unlock();
+}
+
 TEST(SpinlockTest, SequentialLockUnlock) {
     spinlock lock;
     for (int i = 0; i < 1000; ++i) {

@@ -4,8 +4,6 @@
 #include <stdint.h>
 #include <string.h>
 
-#include <cstdint>
-
 #if defined(__GNUC__)
 
 static inline void *maybe_inline_memcpy(void *dest, const void *src, size_t l,

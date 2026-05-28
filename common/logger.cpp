@@ -52,8 +52,9 @@ spdlog::level::level_enum Logger::to_spdlog_level(LogLevel level) {
         return spdlog::level::warn;
     case LogLevel::Error:
         return spdlog::level::err;
+    default:
+        return spdlog::level::info;
     }
-    return spdlog::level::info;
 }
 
 }  // namespace TOPNSPC
