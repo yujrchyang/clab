@@ -6,6 +6,10 @@
 
 #include "common/stack_string_stream.hpp"
 
+using clab::CachedStackStringStream;
+using clab::StackStringBuf;
+using clab::StackStringStream;
+
 TEST(StackStringBufTest, SmallWriteWithinStackSize) {
     StackStringBuf<64> buf;
     std::string_view sv = buf.strv();

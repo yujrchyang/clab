@@ -9,7 +9,10 @@
 #include <string_view>
 #include <vector>
 
+#include "common_fwd.h"
 #include "inline_memory.h"
+
+namespace TOPNSPC {
 
 template <std::size_t SIZE>
 class StackStringBuf : public std::basic_streambuf<char> {
@@ -166,5 +169,7 @@ private:
     inline static thread_local Cache cache;
     osptr osp;
 };
+
+}  // namespace TOPNSPC
 
 #endif  // COMMON_STACKSTRINGSTREAM_HPP
