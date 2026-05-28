@@ -1,5 +1,6 @@
 add_library(common SHARED
     logger.cc
+    safe_io.cc
     spinlock.cc
 )
 target_include_directories(common PUBLIC
