@@ -23,4 +23,12 @@ include(DetectSIMD)
 include(ConfigureChecks)
 
 # --- Testing ---
+# Always enable CTest so `make test` is always available
 enable_testing()
+
+# --- Build options: -DTEST=ON/OFF controls test compilation ---
+enable_testing()
+option(TEST "Build and run tests" ON)
+
+# --- Third-party libraries (Git Submodules) ---
+include(BuildGoogleTest)
