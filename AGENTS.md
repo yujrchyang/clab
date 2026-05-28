@@ -13,8 +13,8 @@ C/C++ project scaffold. No source code yet.
 
 `.clang-format` sorts includes into 3 groups (in order):
 
-1. `<>` with `.h` – system headers
-2. `<>` without `.h` – stdlib / third-party
+1. `<>` with `.h` or `.hpp` – C system / third-party headers
+2. `<>` without `.h` or `.hpp` – C++ stdlib / other third-party
 3. `""` – project headers
 
 Each group sorted alphabetically.

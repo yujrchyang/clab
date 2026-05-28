@@ -1,5 +1,3 @@
-find_package(fmt CONFIG REQUIRED)
-
 add_executable(test_logger test_logger.cpp)
 target_include_directories(test_logger PRIVATE ${PROJECT_SOURCE_DIR})
 target_link_libraries(test_logger
@@ -25,3 +23,11 @@ target_link_libraries(test_inline_memory
         GTest::gtest_main
 )
 add_test(NAME test_inline_memory COMMAND test_inline_memory)
+
+add_executable(test_stack_string_stream test_stack_string_stream.cpp)
+target_include_directories(test_stack_string_stream PRIVATE ${PROJECT_SOURCE_DIR})
+target_link_libraries(test_stack_string_stream
+    PRIVATE
+        GTest::gtest_main
+)
+add_test(NAME test_stack_string_stream COMMAND test_stack_string_stream)

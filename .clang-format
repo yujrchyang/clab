@@ -46,7 +46,7 @@ ReflowComments: false
 # Headers
 IncludeBlocks:   Regroup
 IncludeCategories:
-  - Regex:           '^<.*\.h>'
+  - Regex:           '^<.*\.(h|hpp)>'
     Priority:        1
   - Regex:           '^<.*>'
     Priority:        2

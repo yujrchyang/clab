@@ -23,15 +23,13 @@ include(DetectSIMD)
 include(ConfigureChecks)
 
 # --- Testing ---
-# Always enable CTest so `make test` is always available
 enable_testing()
 
 # --- Build options: -DTEST=ON/OFF controls test compilation ---
-enable_testing()
 option(TEST "Build and run tests" ON)
-if(TEST)
-    add_subdirectory(tests)
-endif()
+
+# --- System dependencies (Boost, fmt, ...) ---
+include(FindDependencies)
 
 # --- Third-party libraries (Git Submodules) ---
 include(BuildGoogleTest)
@@ -40,3 +38,8 @@ include(BuildISAL)
 
 # --- Common library ---
 add_subdirectory(common)
+
+# --- Tests ---
+if(TEST)
+    add_subdirectory(tests)
+endif()
