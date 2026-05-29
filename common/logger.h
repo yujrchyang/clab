@@ -43,6 +43,8 @@ public:
 
     spdlog::logger *operator->() const;
 
+    bool valid() const { return spd_logger_ != nullptr; }
+
 private:
     static spdlog::level::level_enum to_spdlog_level(LogLevel level);
 

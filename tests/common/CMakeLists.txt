@@ -117,6 +117,16 @@ target_link_libraries(test_cpu
 )
 add_test(NAME test_cpu COMMAND test_cpu)
 
+add_executable(test_cassert test_cassert.cc)
+target_include_directories(test_cassert PRIVATE ${PROJECT_SOURCE_DIR})
+target_link_libraries(test_cassert
+    PRIVATE
+        common
+        fmt::fmt
+        GTest::gtest_main
+)
+add_test(NAME test_cassert COMMAND test_cassert)
+
 add_executable(test_armor test_armor.cc)
 target_include_directories(test_armor PRIVATE ${PROJECT_SOURCE_DIR})
 target_link_libraries(test_armor
