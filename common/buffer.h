@@ -5,7 +5,6 @@
 #include <sys/uio.h>
 
 #include <atomic>
-#include <cassert>
 #include <cstddef>
 #include <cstdint>
 #include <istream>
@@ -20,6 +19,7 @@
 #include <vector>
 
 #include "buffer_fwd.h"
+#include "cassert.h"
 #include "common_fwd.h"
 #include "crc32.h"
 #include "deleter.h"
@@ -207,11 +207,11 @@ public:
     bool is_zero() const;
 
     void set_offset(unsigned o) {
-        assert(raw_length() >= o);
+        clab_assert(raw_length() >= o);
         _off = o;
     }
     void set_length(unsigned l) {
-        assert(raw_length() >= l);
+        clab_assert(raw_length() >= l);
         _len = l;
     }
 
@@ -987,7 +987,7 @@ public:
     int send_fd(int fd) const;
     template <typename VectorT>
     void prepare_iov(VectorT *piov) const {
-        assert(_num <= IOV_MAX);
+        clab_assert(_num <= IOV_MAX);
         piov->resize(_num);
         unsigned n = 0;
         for (auto &p : _buffers) {

@@ -1,6 +1,6 @@
 #include "blk/io_context.h"
 
-#include <cassert>
+#include "common/cassert.h"
 
 void IOContext::aio_wait() {
     std::unique_lock l(lock);
@@ -15,6 +15,6 @@ void IOContext::try_aio_wake() {
 }
 
 void IOContext::release_running_aios() {
-    assert(num_running.load() == 0);
+    clab_assert(num_running.load() == 0);
     running_aios.clear();
 }

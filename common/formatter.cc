@@ -1,13 +1,13 @@
 #include <fmt/format.h>
 
 #include <algorithm>
-#include <cassert>
 #include <cstdio>
 #include <cstring>
 #include <limits>
 #include <set>
 
 #include "buffer.h"
+#include "cassert.h"
 #include "formatter.h"
 #include "stack_string_stream.h"
 
@@ -288,7 +288,7 @@ void JSONFormatter::close_section() {
     if (handle_close_section()) {
         return;
     }
-    assert(!m_stack.empty());
+    clab_assert(!m_stack.empty());
     finish_pending_string();
 
     struct json_formatter_stack_entry_d &entry = m_stack.back();
@@ -469,7 +469,7 @@ std::string XMLFormatter::get_xml_name(std::string_view name) const {
 }
 
 void XMLFormatter::close_section() {
-    assert(!m_sections.empty());
+    clab_assert(!m_sections.empty());
     finish_pending_string();
 
     auto section = get_xml_name(m_sections.back());
