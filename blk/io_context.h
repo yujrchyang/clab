@@ -13,8 +13,8 @@ struct IOContext {
     void *priv = nullptr;
     int r = 0;
 
-    std::list<aio_t> pending_aios;   ///< not yet submitted
-    std::list<aio_t> running_aios;   ///< submitting or submitted
+    std::list<aio_t> pending_aios;  ///< not yet submitted
+    std::list<aio_t> running_aios;  ///< submitting or submitted
     std::atomic_int num_pending{0};
     std::atomic_int num_running{0};
 
@@ -28,7 +28,9 @@ struct IOContext {
     IOContext &operator=(const IOContext &) = delete;
 
     bool has_pending_aios() const { return num_pending.load() > 0; }
-    uint64_t get_num_ios() const;
+    uint64_t get_num_ios() const {
+        return num_pending.load() + num_running.load();
+    }
 
     void aio_wait();
     void try_aio_wake();
@@ -38,4 +40,4 @@ struct IOContext {
     int get_return_value() const { return r; }
 };
 
-#endif // BLK_IO_CONTEXT_H
+#endif  // BLK_IO_CONTEXT_H

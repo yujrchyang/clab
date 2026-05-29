@@ -4,6 +4,10 @@
 
 #include "blk/aio.h"
 
+// aio_t is not standard-layout (boost::small_vector), but iocb is at offset 0
+// and aio_t has no virtual functions, so the reinterpret_cast in
+// get_next_completed is valid on all supported compilers (same as Ceph).
+
 // ---------------------------------------------------------------------------
 // aio_t
 // ---------------------------------------------------------------------------
@@ -13,14 +17,12 @@ void aio_t::pwritev(uint64_t _offset, uint64_t len) {
     offset = _offset;
     length = len;
     io_prep_pwritev(&iocb, fd, iov.data(), iov.size(), _offset);
-    iocb.data = this;
 }
 
 void aio_t::preadv(uint64_t _offset, uint64_t len) {
     offset = _offset;
     length = len;
     io_prep_preadv(&iocb, fd, iov.data(), iov.size(), _offset);
-    iocb.data = this;
 }
 
 std::ostream &operator<<(std::ostream &os, const aio_t &aio) {
@@ -63,19 +65,24 @@ int aio_queue_t::submit_batch(aio_iter begin, aio_iter end,
     std::vector<struct iocb *> iocbs;
     iocbs.reserve(std::distance(begin, end));
     for (auto it = begin; it != end; ++it) {
-        it->iocb.data = priv;
+        it->priv = priv;
         iocbs.push_back(&it->iocb);
     }
 
     int r = 0;
     auto p = iocbs.data();
     auto left = iocbs.size();
+    int attempts = *retries;
+    int delay_us = 125;
     while (left > 0) {
         int submitted = io_submit(ctx, left, p);
         if (submitted < 0) {
             int err = -submitted;
-            if (err == EAGAIN && *retries > 0) {
-                --(*retries);
+            if (err == EAGAIN && attempts > 0) {
+                --attempts;
+                ++(*retries);
+                usleep(delay_us);
+                delay_us *= 2;
                 continue;
             }
             if (r == 0)

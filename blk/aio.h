@@ -17,7 +17,7 @@
 // aio_t — single asynchronous I/O operation
 // ---------------------------------------------------------------------------
 struct aio_t {
-    struct iocb iocb {};  // must be first element; see aio_queue_t
+    struct iocb iocb {};
 
     void *priv;
     int fd;

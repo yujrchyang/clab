@@ -55,9 +55,11 @@ TEST(IOContextTest, GetNumIosCountsPendingAios) {
     int fd = -1;
     IOContext ctx(nullptr);
     ctx.pending_aios.emplace_back(&marker, fd);
+    ctx.num_pending.fetch_add(1);
     EXPECT_EQ(ctx.get_num_ios(), 1);
     ctx.pending_aios.emplace_back(&marker, fd);
     ctx.pending_aios.emplace_back(&marker, fd);
+    ctx.num_pending.fetch_add(2);
     EXPECT_EQ(ctx.get_num_ios(), 3);
 }
 
@@ -111,25 +113,31 @@ TEST(IOContextTest, AioWaitBlocksThenWakes) {
 TEST(IOContextTest, MultipleTryAioWakeOnlyWakesOnLast) {
     IOContext ctx(nullptr);
     ctx.num_running.store(3);
+    std::atomic<bool> started{false};
+    std::atomic<bool> done{false};
 
     std::thread waiter([&]() {
-        auto start = std::chrono::steady_clock::now();
+        started.store(true);
         ctx.aio_wait();
-        auto elapsed = std::chrono::steady_clock::now() - start;
-        EXPECT_GE(elapsed, std::chrono::milliseconds(100));
+        done.store(true);
     });
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    while (!started.load())
+        std::this_thread::yield();
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+
     ctx.try_aio_wake();
     EXPECT_EQ(ctx.num_running.load(), 2);
+    EXPECT_FALSE(done.load());
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(50));
     ctx.try_aio_wake();
     EXPECT_EQ(ctx.num_running.load(), 1);
+    EXPECT_FALSE(done.load());
 
     ctx.try_aio_wake();
     EXPECT_EQ(ctx.num_running.load(), 0);
     waiter.join();
+    EXPECT_TRUE(done.load());
 }
 
 TEST(IOContextTest, ConcurrentTryAioWakeFromMultipleThreads) {

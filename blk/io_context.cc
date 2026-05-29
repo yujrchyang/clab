@@ -1,25 +1,20 @@
 #include "blk/io_context.h"
 
-void IOContext::aio_wait()
-{
+#include <cassert>
+
+void IOContext::aio_wait() {
     std::unique_lock l(lock);
     while (num_running.load() > 0)
         cond.wait(l);
 }
 
-void IOContext::try_aio_wake()
-{
+void IOContext::try_aio_wake() {
     std::lock_guard l(lock);
     if (num_running.fetch_sub(1) == 1)
         cond.notify_all();
 }
 
-void IOContext::release_running_aios()
-{
+void IOContext::release_running_aios() {
+    assert(num_running.load() == 0);
     running_aios.clear();
-}
-
-uint64_t IOContext::get_num_ios() const
-{
-    return pending_aios.size();
 }
