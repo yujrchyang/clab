@@ -145,6 +145,16 @@ target_link_libraries(test_buffer
 )
 add_test(NAME test_buffer COMMAND test_buffer)
 
+add_executable(test_denc test_denc.cc)
+target_include_directories(test_denc PRIVATE ${PROJECT_SOURCE_DIR})
+target_link_libraries(test_denc
+    PRIVATE
+        common
+        fmt::fmt
+        GTest::gtest_main
+)
+add_test(NAME test_denc COMMAND test_denc)
+
 add_executable(test_formatter test_formatter.cc)
 target_include_directories(test_formatter PRIVATE ${PROJECT_SOURCE_DIR})
 target_link_libraries(test_formatter
