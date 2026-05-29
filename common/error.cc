@@ -1,6 +1,6 @@
-#include "error.h"
-
 #include <system_error>
+
+#include "error.h"
 
 namespace TOPNSPC {
 

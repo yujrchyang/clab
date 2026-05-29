@@ -1,8 +1,8 @@
-#include "blk/aio.h"
-
 #include <cerrno>
 #include <ostream>
 #include <vector>
+
+#include "blk/aio.h"
 
 // ---------------------------------------------------------------------------
 // aio_t

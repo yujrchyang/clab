@@ -1,11 +1,11 @@
-#include "cpu.h"
-
 #if defined(__x86_64__)
 #include <cpuid.h>
 #elif defined(__linux__) && (defined(__arm__) || defined(__aarch64__))
 #include <asm/hwcap.h>
 #include <sys/auxv.h>
 #endif
+
+#include "cpu.h"
 
 namespace TOPNSPC {
 namespace cpu {

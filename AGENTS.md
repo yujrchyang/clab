@@ -11,11 +11,17 @@ C/C++ project scaffold. No source code yet.
 
 ## Headers
 
-`.clang-format` sorts includes into 4 groups (in order):
+`IncludeBlocks: Preserve` — clang-format preserves user-defined groups
+(separated by blank lines). Within each group, `IncludeCategories` define
+the sort priority:
 
-1. `<>` with `.h` – C system headers
-2. `<>` without `.h` or `.hpp` – C++ standard library
-3. `<>` with `.hpp` – third-party headers
-4. `""` – project headers
+| Priority | Pattern | Example headers |
+|----------|---------|-----------------|
+| 1 | `<` + `.h` | `<fcntl.h>`, `<unistd.h>`, `<gtest/gtest.h>`, `<libaio.h>` |
+| 2 | `<` + no `.h` or `.hpp` | `<vector>`, `<cstdlib>`, `<memory>` |
+| 3 | `<` + `.hpp` | `<boost/container/small_vector.hpp>` |
+| 4 | `""` | `"blk/aio.h"`, `"common/buffer.h"` |
 
-Each group sorted alphabetically.
+Within each priority, headers are sorted alphabetically. To create or
+remove a group, add or remove the blank line between blocks. Includes
+never migrate across blank lines.

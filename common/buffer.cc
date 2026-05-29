@@ -1,5 +1,3 @@
-#include "buffer.h"
-
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
@@ -15,6 +13,7 @@
 #include <sstream>
 
 #include "armor.h"
+#include "buffer.h"
 #include "buffer_error.h"
 #include "error.h"
 #include "intarith.h"

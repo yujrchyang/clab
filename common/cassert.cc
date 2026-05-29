@@ -1,5 +1,3 @@
-#include "cassert.h"
-
 #include <cxxabi.h>
 #include <errno.h>
 #include <execinfo.h>
@@ -15,6 +13,7 @@
 #include <sstream>
 #include <string>
 
+#include "cassert.h"
 #include "logger.h"
 
 namespace TOPNSPC {

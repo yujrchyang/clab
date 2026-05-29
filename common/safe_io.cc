@@ -1,5 +1,3 @@
-#include "safe_io.h"
-
 #include <fcntl.h>
 #include <sys/socket.h>
 #include <unistd.h>
@@ -8,6 +6,8 @@
 #include <climits>
 #include <cstdio>
 #include <cstring>
+
+#include "safe_io.h"
 
 #ifndef O_BINARY
 #define O_BINARY 0

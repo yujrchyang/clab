@@ -1,5 +1,3 @@
-#include "crc32.h"
-
 #include <array>
 
 #ifdef HAVE_ISA_L
@@ -7,6 +5,8 @@ extern "C" {
 #include <isa-l.h>
 }
 #endif
+
+#include "crc32.h"
 
 namespace TOPNSPC {
 namespace {

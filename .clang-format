@@ -44,7 +44,7 @@ BinPackParameters: true
 ReflowComments: false
 
 # Headers
-IncludeBlocks:   Regroup
+IncludeBlocks:   Preserve
 IncludeCategories:
   - Regex:           '^<.*\.h>'
     Priority:        1

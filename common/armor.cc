@@ -1,6 +1,6 @@
-#include "armor.h"
-
 #include <cerrno>
+
+#include "armor.h"
 
 namespace TOPNSPC {
 namespace {

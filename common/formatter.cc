@@ -1,5 +1,3 @@
-#include "formatter.h"
-
 #include <fmt/format.h>
 
 #include <algorithm>
@@ -10,6 +8,7 @@
 #include <set>
 
 #include "buffer.h"
+#include "formatter.h"
 #include "stack_string_stream.h"
 
 #define LARGE_SIZE 1024
