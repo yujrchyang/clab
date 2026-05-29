@@ -1,13 +1,13 @@
 #ifndef COMMON_STACKSTRINGSTREAM_H
 #define COMMON_STACKSTRINGSTREAM_H
 
-#include <boost/container/small_vector.hpp>
-
 #include <algorithm>
 #include <memory>
 #include <ostream>
 #include <string_view>
 #include <vector>
+
+#include <boost/container/small_vector.hpp>
 
 #include "common_fwd.h"
 #include "inline_memory.h"

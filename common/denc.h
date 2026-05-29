@@ -1,11 +1,6 @@
 #ifndef COMMON_DENC_H
 #define COMMON_DENC_H
 
-#include <boost/container/flat_map.hpp>
-#include <boost/container/flat_set.hpp>
-#include <boost/container/small_vector.hpp>
-#include <boost/optional.hpp>
-
 #include <array>
 #include <cstdint>
 #include <cstring>
@@ -16,6 +11,11 @@
 #include <string>
 #include <type_traits>
 #include <vector>
+
+#include <boost/container/flat_map.hpp>
+#include <boost/container/flat_set.hpp>
+#include <boost/container/small_vector.hpp>
+#include <boost/optional.hpp>
 
 #include "buffer.h"
 #include "buffer_error.h"

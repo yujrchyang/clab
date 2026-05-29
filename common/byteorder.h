@@ -1,8 +1,9 @@
 #ifndef COMMON_BYTEORDER_H
 #define COMMON_BYTEORDER_H
 
-#include <boost/endian/conversion.hpp>
 #include <linux/types.h>
+
+#include <boost/endian/conversion.hpp>
 
 template <typename T>
 inline T swab(T val) {

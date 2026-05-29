@@ -1,14 +1,14 @@
 #ifndef COMMON_CONVENIENCE_H
 #define COMMON_CONVENIENCE_H
 
-#include <boost/optional.hpp>
-
 #include <memory>
 #include <mutex>
 #include <optional>
 #include <shared_mutex>
 #include <type_traits>
 #include <utility>
+
+#include <boost/optional.hpp>
 
 #include "common_fwd.h"
 
