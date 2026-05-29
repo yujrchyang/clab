@@ -1213,7 +1213,7 @@ const char &buffer::list::operator[](unsigned n) const {
         }
         return node[n];
     }
-    abort();
+    clab_abort_msg("unreachable");
 }
 
 char *buffer::list::c_str() {
