@@ -134,3 +134,12 @@ target_link_libraries(test_buffer
         GTest::gtest_main
 )
 add_test(NAME test_buffer COMMAND test_buffer)
+
+add_executable(test_formatter test_formatter.cc)
+target_include_directories(test_formatter PRIVATE ${PROJECT_SOURCE_DIR})
+target_link_libraries(test_formatter
+    PRIVATE
+        common
+        GTest::gtest_main
+)
+add_test(NAME test_formatter COMMAND test_formatter)

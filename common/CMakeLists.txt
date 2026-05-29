@@ -4,6 +4,7 @@ add_library(common SHARED
     cpu.cc
     crc32.cc
     error.cc
+    formatter.cc
     logger.cc
     safe_io.cc
     spinlock.cc

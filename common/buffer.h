@@ -19,6 +19,7 @@
 #include <utility>
 #include <vector>
 
+#include "buffer_fwd.h"
 #include "common_fwd.h"
 #include "crc32.h"
 #include "deleter.h"
@@ -26,20 +27,10 @@
 #include "page.h"
 #include "spinlock.h"
 
-template <typename T>
-class DencDumper;
-
 namespace TOPNSPC {
 
-namespace buffer {
-class ptr;
-class list;
-class hash;
-}  // namespace buffer
-
-using bufferptr = buffer::ptr;
-using bufferlist = buffer::list;
-using bufferhash = buffer::hash;
+template <typename T>
+class DencDumper;
 
 template <class T>
 struct nop_delete {
@@ -626,7 +617,7 @@ public:
 
         friend class list;
         template <typename Type>
-        friend class ::DencDumper;
+        friend class DencDumper;
 
     public:
         ~contiguous_appender() {
