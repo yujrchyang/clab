@@ -25,5 +25,6 @@ const typeDef = [
 const scopeDef = [
     'global',
     'common',
+    'blk',
     'test'
 ]

@@ -39,6 +39,9 @@ include(BuildISAL)
 # --- Common library ---
 add_subdirectory(common)
 
+# --- Block device library ---
+add_subdirectory(blk)
+
 # --- Tests ---
 if(TEST)
     add_subdirectory(tests)

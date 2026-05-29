@@ -117,7 +117,12 @@ if(liburing_FOUND)
     add_compile_definitions(HAVE_LIBURING=1)
 endif()
 
-pkg_check_modules(libaio QUIET libaio)
-if(libaio_FOUND)
-    add_compile_definitions(HAVE_LIBAIO=1)
+# libaio (Linux native AIO) — required
+find_package(aio)
+if(NOT AIO_FOUND)
+    message(FATAL_ERROR "\nlibaio is required but not found. Please install it:\n"
+        "  Debian/Ubuntu: sudo apt install libaio-dev\n"
+        "  RHEL/Fedora:   sudo dnf install libaio-devel\n"
+        "  Arch Linux:    sudo pacman -S libaio\n")
 endif()
+add_compile_definitions(HAVE_LIBAIO=1)
