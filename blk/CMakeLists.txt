@@ -1,5 +1,6 @@
 add_library(blk SHARED
     aio.cc
+    io_context.cc
 )
 target_include_directories(blk PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
