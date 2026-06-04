@@ -62,6 +62,26 @@ namespace TOPNSPC {
 
 inline constexpr logger_internal::DefaultModule LOG_MODULE = logger_internal::LOG_MODULE_FALLBACK;
 
+// --- Helpers ---
+std::string get_timestamp();
+std::string get_thread_name();
+
+// --- Filename builders ---
+std::string make_crash_log_filename();
+std::string make_normal_log_filename();
+
+// --- Default logger accessors (singletons) ---
+Logger &get_crash_logger();
+Logger &get_default_logger();
+
+// --- Custom logger factories ---
+Logger make_crash_logger(const std::string &log_dir,
+                          const std::string &file_name,
+                          LogLevel level = LogLevel::Trace);
+Logger make_default_logger(const std::string &log_dir,
+                            const std::string &file_name,
+                            LogLevel level = LogLevel::Info);
+
 }  // namespace TOPNSPC
 
 template <>

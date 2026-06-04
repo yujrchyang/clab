@@ -1,16 +1,12 @@
 #include <cxxabi.h>
-#include <errno.h>
 #include <execinfo.h>
 #include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
-#include <chrono>
 #include <cstdarg>
 #include <cstdio>
-#include <iomanip>
-#include <sstream>
 #include <string>
 
 #include "cassert.h"
@@ -79,82 +75,18 @@ private:
     size_t size_{0};
 };
 
-// ── Helpers ────────────────────────────────────────────────────
+// ── Crash logger (delegates to logger module) ───────────────────
 
-std::string format_timestamp(const char *fmt) {
-    using namespace std::chrono;
-    auto now = system_clock::now();
-    auto secs = time_point_cast<seconds>(now);
-    auto us = duration_cast<microseconds>(now - secs).count();
-
-    std::tm lt;
-    time_t t = system_clock::to_time_t(secs);
-    localtime_r(&t, &lt);
-
-    std::ostringstream oss;
-    oss << std::put_time(&lt, fmt)
-        << "." << std::setfill('0') << std::setw(6) << us;
-    return oss.str();
-}
-
-std::string get_timestamp() {
-    return format_timestamp("%Y-%m-%d %H:%M:%S");
-}
-
-std::string get_file_safe_timestamp() {
-    return format_timestamp("%Y-%m-%d_%H-%M-%S");
-}
-
-std::string get_process_name() {
-    if (program_invocation_short_name &&
-        program_invocation_short_name[0]) {
-        return program_invocation_short_name;
-    }
-    return "unknown";
-}
-
-std::string get_thread_name() {
-    char name[32]{};
-    if (pthread_getname_np(pthread_self(), name, sizeof(name)) == 0) {
-        return name;
-    }
-    return "unknown";
-}
-
-std::pair<std::string, std::string> build_crash_log_path() {
-    auto proc = get_process_name();
-    auto thread = get_thread_name();
-    auto tid = (unsigned long long)pthread_self();
-    auto ts = get_file_safe_timestamp();
-    std::ostringstream fname;
-    fname << "coredump+" << proc << "+" << thread << "+"
-          << tid << "+" << ts << ".log";
-    return {"/tmp", fname.str()};
-}
-
-// First-call creates the crash logger; subsequent calls reuse it.
-Logger *get_crash_logger() {
-    static Logger *logger = nullptr;
-    if (logger) return logger;
-
-    try {
-        auto [dir, name] = build_crash_log_path();
-        static Logger crash_logger(dir, name, LogLevel::Trace);
-        if (crash_logger.valid()) {
-            logger = &crash_logger;
-        }
-    } catch (const std::exception &e) {
-        fprintf(stderr, "failed to create crash logger: %s\n", e.what());
-    }
-    return logger;
+Logger &get_crash_logger() {
+    return TOPNSPC::get_crash_logger();
 }
 
 [[noreturn]] void emit_and_abort(const std::string &msg) {
-    auto *log = get_crash_logger();
-    if (log) {
+    auto &log = get_crash_logger();
+    if (log.valid()) {
         try {
-            (*log)->error("{}", msg);
-            (*log)->flush();
+            log->error("{}", msg);
+            log->flush();
         } catch (...) {
             fprintf(stderr, "%s\n", msg.c_str());
         }
@@ -165,11 +97,11 @@ Logger *get_crash_logger() {
 }
 
 void emit_warn(const std::string &msg) {
-    auto *log = get_crash_logger();
-    if (log) {
+    auto &log = get_crash_logger();
+    if (log.valid()) {
         try {
-            (*log)->warn("{}", msg);
-            (*log)->flush();
+            log->warn("{}", msg);
+            log->flush();
         } catch (...) {
             fprintf(stderr, "%s\n", msg.c_str());
         }

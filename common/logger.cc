@@ -1,3 +1,13 @@
+#include <pthread.h>
+#include <errno.h>
+#include <unistd.h>
+
+#include <chrono>
+#include <cstdio>
+#include <iomanip>
+#include <sstream>
+#include <string>
+
 #include "logger.h"
 
 namespace TOPNSPC {
@@ -55,6 +65,93 @@ spdlog::level::level_enum Logger::to_spdlog_level(LogLevel level) {
     default:
         return spdlog::level::info;
     }
+}
+
+// ── Internal helpers ────────────────────────────────────────────
+
+namespace {
+
+std::string format_timestamp(const char *fmt) {
+    using namespace std::chrono;
+    auto now = system_clock::now();
+    auto secs = time_point_cast<seconds>(now);
+    auto us = duration_cast<microseconds>(now - secs).count();
+
+    std::tm lt;
+    time_t t = system_clock::to_time_t(secs);
+    localtime_r(&t, &lt);
+
+    std::ostringstream oss;
+    oss << std::put_time(&lt, fmt)
+        << "." << std::setfill('0') << std::setw(6) << us;
+    return oss.str();
+}
+
+std::string get_file_safe_timestamp() {
+    return format_timestamp("%Y-%m-%d_%H-%M-%S");
+}
+
+std::string get_process_name() {
+    if (program_invocation_short_name &&
+        program_invocation_short_name[0]) {
+        return program_invocation_short_name;
+    }
+    return "unknown";
+}
+
+}  // anonymous namespace
+
+// ── Public helpers ──────────────────────────────────────────────
+
+std::string get_timestamp() {
+    return format_timestamp("%Y-%m-%d %H:%M:%S");
+}
+
+std::string get_thread_name() {
+    char name[32]{};
+    if (pthread_getname_np(pthread_self(), name, sizeof(name)) == 0) {
+        return name;
+    }
+    return "unknown";
+}
+
+// ── Filename builders ──────────────────────────────────────────
+
+std::string make_crash_log_filename() {
+    auto proc = get_process_name();
+    auto thread = get_thread_name();
+    auto ts = get_file_safe_timestamp();
+    return proc + "+" + thread + "+" + ts + "+coredump.log";
+}
+
+std::string make_normal_log_filename() {
+    return get_process_name() + ".log";
+}
+
+// ── Singleton logger accessors ─────────────────────────────────
+
+Logger &get_crash_logger() {
+    static Logger crash_logger("/tmp", make_crash_log_filename(), LogLevel::Trace);
+    return crash_logger;
+}
+
+Logger &get_default_logger() {
+    static Logger default_logger("/tmp", make_normal_log_filename(), LogLevel::Info);
+    return default_logger;
+}
+
+// ── Custom logger factories ────────────────────────────────────
+
+Logger make_crash_logger(const std::string &log_dir,
+                          const std::string &file_name,
+                          LogLevel level) {
+    return Logger(log_dir, file_name, level);
+}
+
+Logger make_default_logger(const std::string &log_dir,
+                            const std::string &file_name,
+                            LogLevel level) {
+    return Logger(log_dir, file_name, level);
 }
 
 }  // namespace TOPNSPC
