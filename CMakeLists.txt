@@ -43,6 +43,9 @@ add_subdirectory(common)
 # --- Block device library ---
 add_subdirectory(blk)
 
+# --- KV storage library ---
+add_subdirectory(kv)
+
 # --- Tests ---
 if(TEST)
     add_subdirectory(tests)

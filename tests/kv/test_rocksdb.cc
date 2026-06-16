@@ -1,18 +1,27 @@
 #include <gtest/gtest.h>
 #include <unistd.h>
 
+#include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <map>
+#include <memory>
+#include <optional>
+#include <set>
 #include <string>
-
-#include <rocksdb/db.h>
-#include <rocksdb/merge_operator.h>
-#include <rocksdb/options.h>
-#include <rocksdb/slice.h>
-#include <rocksdb/utilities/write_batch_with_index.h>
-#include <rocksdb/write_batch.h>
+#include <vector>
 
 #include "clab_test.h"
+#include "common/buffer.h"
+#include "kv/key_value_db.h"
+#include "kv/merge_op/int64_array_merge_op.h"
+#include "kv/merge_op/xor_merge_op.h"
+
+using namespace kv;
+
+namespace {
+
+using TOPNSPC::bufferlist;
 
 static std::string tmpdir() {
     auto tmpl = clab_tmp_dir("rocksdb");
@@ -22,496 +31,339 @@ static std::string tmpdir() {
     return buf;
 }
 
-// ---------------------------------------------------------------------------
-// Merge operator: element-wise int64 addition (same as Int64ArrayMergeOperator
-// in the kv design)
-// ---------------------------------------------------------------------------
-class Int64ArrayMergeOp : public rocksdb::MergeOperator {
-public:
-    const char *Name() const override { return "int64_array"; }
+bufferlist to_bl(const std::string &s) {
+    bufferlist bl;
+    bl.append(s.data(), static_cast<unsigned>(s.size()));
+    return bl;
+}
 
-    bool FullMergeV2(const MergeOperationInput &merge_in,
-                     MergeOperationOutput *merge_out) const override {
-        const rocksdb::Slice *existing = merge_in.existing_value;
-        const auto &operands = merge_in.operand_list;
-        if (!existing) {
-            // No existing value — write the accumulation of all operands
-            int64_t sum = 0;
-            for (auto &op : operands) {
-                auto *d = reinterpret_cast<const int64_t *>(op.data());
-                size_t n = op.size() / sizeof(int64_t);
-                for (size_t i = 0; i < n; i++)
-                    sum += d[i];
-            }
-            merge_out->new_value.assign(reinterpret_cast<char *>(&sum),
-                                        sizeof(sum));
-            return true;
-        }
-        // Accumulate existing + all operands element-wise
-        auto *edata = reinterpret_cast<const int64_t *>(existing->data());
-        size_t elen = existing->size() / sizeof(int64_t);
-        std::vector<int64_t> result(elen);
-        for (size_t i = 0; i < elen; i++)
-            result[i] = edata[i];
-        for (auto &op : operands) {
-            auto *d = reinterpret_cast<const int64_t *>(op.data());
-            size_t n = op.size() / sizeof(int64_t);
-            for (size_t i = 0; i < std::min(elen, n); i++)
-                result[i] += d[i];
-        }
-        merge_out->new_value.assign(reinterpret_cast<char *>(result.data()),
-                                    elen * sizeof(int64_t));
-        return true;
-    }
-};
-
-// ---------------------------------------------------------------------------
-// Test fixture
-// ---------------------------------------------------------------------------
-class RocksDBTest : public ::testing::Test {
+class RocksDBStoreTest : public ::testing::Test {
 protected:
+    std::unique_ptr<KeyValueDB> db;
     std::string dbpath_;
-    rocksdb::DB *db_ = nullptr;
 
     void SetUp() override {
         dbpath_ = tmpdir();
         ASSERT_FALSE(dbpath_.empty()) << "mkdtemp failed";
+        db = KeyValueDB::create("rocksdb", dbpath_);
+        ASSERT_NE(db, nullptr);
     }
 
     void TearDown() override {
-        delete db_;
+        db->close();
         std::filesystem::remove_all(dbpath_);
     }
 
-    void OpenDb() {
-        rocksdb::Options opts;
-        opts.create_if_missing = true;
-        auto s = rocksdb::DB::Open(opts, dbpath_, &db_);
-        ASSERT_TRUE(s.ok()) << s.ToString();
+    void set(const std::string &prefix, const std::string &key,
+             const std::string &value) {
+        auto t = db->get_transaction();
+        t->set(prefix, key, to_bl(value));
+        ASSERT_EQ(db->submit_transaction_sync(t), 0);
     }
 
-    void OpenDbWithMerge() {
-        rocksdb::Options opts;
-        opts.create_if_missing = true;
-        opts.merge_operator = std::make_shared<Int64ArrayMergeOp>();
-        auto s = rocksdb::DB::Open(opts, dbpath_, &db_);
-        ASSERT_TRUE(s.ok()) << s.ToString();
-    }
-
-    std::string pkey(const std::string &prefix, const std::string &key) {
-        return prefix + '\0' + key;
+    std::optional<std::string> get(const std::string &prefix,
+                                    const std::string &key) {
+        bufferlist bl;
+        int r = db->get(prefix, key, &bl);
+        if (r != 0) return std::nullopt;
+        return bl.to_str();
     }
 };
 
-// ---------------------------------------------------------------------------
-// Open / Close
-// ---------------------------------------------------------------------------
-TEST_F(RocksDBTest, OpenAndClose) {
-    OpenDb();
-    ASSERT_NE(db_, nullptr);
-    // db_ deleted in TearDown
+// ── Lifecycle ──────────────────────────────────────────────────
+
+TEST_F(RocksDBStoreTest, CreateAndOpen) {
+    ASSERT_EQ(db->create_and_open(std::cerr), 0);
 }
 
-TEST_F(RocksDBTest, OpenExisting) {
-    OpenDb();
-    delete db_;
-    db_ = nullptr;
+TEST_F(RocksDBStoreTest, ReopenPersistence) {
+    ASSERT_EQ(db->create_and_open(std::cerr), 0);
+    set("S", "key", "persist-data");
+    db->close();
 
-    rocksdb::Options opts;
-    opts.create_if_missing = false;
-    auto s = rocksdb::DB::Open(opts, dbpath_, &db_);
-    ASSERT_TRUE(s.ok()) << s.ToString();
+    auto db2 = KeyValueDB::create("rocksdb", dbpath_);
+    ASSERT_NE(db2, nullptr);
+    ASSERT_EQ(db2->open(std::cerr), 0);
+    auto val = [&]() -> std::optional<std::string> {
+        bufferlist bl;
+        int r = db2->get("S", "key", &bl);
+        if (r != 0) return std::nullopt;
+        return bl.to_str();
+    }();
+    ASSERT_TRUE(val.has_value());
+    EXPECT_EQ(*val, "persist-data");
+    db2->close();
 }
 
-// ---------------------------------------------------------------------------
-// Point Read / Write
-// ---------------------------------------------------------------------------
-TEST_F(RocksDBTest, PutAndGet) {
-    OpenDb();
-    auto s = db_->Put(rocksdb::WriteOptions(), "key1", "hello rocksdb");
-    ASSERT_TRUE(s.ok());
+// ── Point Read / Write ────────────────────────────────────────
 
-    std::string val;
-    s = db_->Get(rocksdb::ReadOptions(), "key1", &val);
-    ASSERT_TRUE(s.ok());
-    EXPECT_EQ(val, "hello rocksdb");
+TEST_F(RocksDBStoreTest, PutAndGet) {
+    ASSERT_EQ(db->create_and_open(std::cerr), 0);
+    set("O", "obj1", "onode-data");
+    EXPECT_EQ(get("O", "obj1"), "onode-data");
 }
 
-TEST_F(RocksDBTest, GetNotFound) {
-    OpenDb();
-    std::string val;
-    auto s = db_->Get(rocksdb::ReadOptions(), "nonexistent", &val);
-    ASSERT_TRUE(s.IsNotFound());
+TEST_F(RocksDBStoreTest, GetNotFound) {
+    ASSERT_EQ(db->create_and_open(std::cerr), 0);
+    EXPECT_FALSE(get("X", "nonexistent").has_value());
 }
 
-TEST_F(RocksDBTest, Overwrite) {
-    OpenDb();
-    ASSERT_TRUE(db_->Put(rocksdb::WriteOptions(), "k", "v1").ok());
-    ASSERT_TRUE(db_->Put(rocksdb::WriteOptions(), "k", "v2").ok());
-
-    std::string val;
-    ASSERT_TRUE(db_->Get(rocksdb::ReadOptions(), "k", &val).ok());
-    EXPECT_EQ(val, "v2");
+TEST_F(RocksDBStoreTest, Overwrite) {
+    ASSERT_EQ(db->create_and_open(std::cerr), 0);
+    set("O", "k", "v1");
+    set("O", "k", "v2");
+    EXPECT_EQ(get("O", "k"), "v2");
 }
 
-// ---------------------------------------------------------------------------
-// Delete
-// ---------------------------------------------------------------------------
-TEST_F(RocksDBTest, Delete) {
-    OpenDb();
-    ASSERT_TRUE(db_->Put(rocksdb::WriteOptions(), "k", "v").ok());
-    ASSERT_TRUE(db_->Delete(rocksdb::WriteOptions(), "k").ok());
+TEST_F(RocksDBStoreTest, BatchGet) {
+    ASSERT_EQ(db->create_and_open(std::cerr), 0);
+    set("O", "a", "1");
+    set("O", "b", "2");
+    set("O", "c", "3");
 
-    std::string val;
-    auto s = db_->Get(rocksdb::ReadOptions(), "k", &val);
-    EXPECT_TRUE(s.IsNotFound());
+    std::set<std::string> keys{"a", "b", "c", "z"};
+    std::map<std::string, bufferlist> result;
+    ASSERT_EQ(db->get("O", keys, &result), 0);
+    EXPECT_EQ(result.size(), 3);
+    EXPECT_EQ(result["a"].to_str(), "1");
+    EXPECT_EQ(result["b"].to_str(), "2");
+    EXPECT_EQ(result["c"].to_str(), "3");
 }
 
-TEST_F(RocksDBTest, DeleteNonExistent) {
-    OpenDb();
-    auto s = db_->Delete(rocksdb::WriteOptions(), "nonexistent");
-    EXPECT_TRUE(s.ok());
+// ── Delete ─────────────────────────────────────────────────────
+
+TEST_F(RocksDBStoreTest, Delete) {
+    ASSERT_EQ(db->create_and_open(std::cerr), 0);
+    set("O", "k", "v");
+    {
+        auto t = db->get_transaction();
+        t->rmkey("O", "k");
+        ASSERT_EQ(db->submit_transaction_sync(t), 0);
+    }
+    EXPECT_FALSE(get("O", "k").has_value());
 }
 
-TEST_F(RocksDBTest, SingleDelete) {
-    OpenDb();
-    ASSERT_TRUE(db_->Put(rocksdb::WriteOptions(), "k", "v").ok());
-    ASSERT_TRUE(
-        db_->SingleDelete(rocksdb::WriteOptions(), "k").ok());
-
-    std::string val;
-    EXPECT_TRUE(
-        db_->Get(rocksdb::ReadOptions(), "k", &val).IsNotFound());
+TEST_F(RocksDBStoreTest, DeleteNonExistent) {
+    ASSERT_EQ(db->create_and_open(std::cerr), 0);
+    auto t = db->get_transaction();
+    t->rmkey("O", "nonexistent");
+    ASSERT_EQ(db->submit_transaction_sync(t), 0);
 }
 
-// ---------------------------------------------------------------------------
-// Range Delete (DeleteRange)
-// ---------------------------------------------------------------------------
-TEST_F(RocksDBTest, DeleteRange) {
-    OpenDb();
-    ASSERT_TRUE(db_->Put(rocksdb::WriteOptions(), "a", "1").ok());
-    ASSERT_TRUE(db_->Put(rocksdb::WriteOptions(), "b", "2").ok());
-    ASSERT_TRUE(db_->Put(rocksdb::WriteOptions(), "c", "3").ok());
-    ASSERT_TRUE(db_->Put(rocksdb::WriteOptions(), "d", "4").ok());
-
-    rocksdb::WriteBatch batch;
-    batch.DeleteRange("b", "d");
-    ASSERT_TRUE(db_->Write(rocksdb::WriteOptions(), &batch).ok());
-
-    std::string val;
-    EXPECT_TRUE(db_->Get(rocksdb::ReadOptions(), "a", &val).ok());
-    EXPECT_TRUE(db_->Get(rocksdb::ReadOptions(), "b", &val).IsNotFound());
-    EXPECT_TRUE(db_->Get(rocksdb::ReadOptions(), "c", &val).IsNotFound());
-    EXPECT_TRUE(db_->Get(rocksdb::ReadOptions(), "d", &val).ok());
+TEST_F(RocksDBStoreTest, DeleteByPrefix) {
+    ASSERT_EQ(db->create_and_open(std::cerr), 0);
+    set("O", "a", "1");
+    set("O", "b", "2");
+    set("M", "k", "keep");
+    {
+        auto t = db->get_transaction();
+        t->rmkeys_by_prefix("O");
+        ASSERT_EQ(db->submit_transaction_sync(t), 0);
+    }
+    EXPECT_FALSE(get("O", "a").has_value());
+    EXPECT_FALSE(get("O", "b").has_value());
+    EXPECT_EQ(get("M", "k"), "keep");
 }
 
-// ---------------------------------------------------------------------------
-// Iterator
-// ---------------------------------------------------------------------------
-TEST_F(RocksDBTest, IteratorForward) {
-    OpenDb();
-    ASSERT_TRUE(db_->Put(rocksdb::WriteOptions(), "a", "1").ok());
-    ASSERT_TRUE(db_->Put(rocksdb::WriteOptions(), "b", "2").ok());
-    ASSERT_TRUE(db_->Put(rocksdb::WriteOptions(), "c", "3").ok());
-
-    auto it = std::unique_ptr<rocksdb::Iterator>(
-        db_->NewIterator(rocksdb::ReadOptions()));
-    it->SeekToFirst();
-    std::vector<std::pair<std::string, std::string>> got;
-    for (; it->Valid(); it->Next())
-        got.emplace_back(it->key().ToString(), it->value().ToString());
-
-    ASSERT_EQ(got.size(), 3);
-    EXPECT_EQ(got[0].first, "a");
-    EXPECT_EQ(got[0].second, "1");
-    EXPECT_EQ(got[1].first, "b");
-    EXPECT_EQ(got[1].second, "2");
-    EXPECT_EQ(got[2].first, "c");
-    EXPECT_EQ(got[2].second, "3");
+TEST_F(RocksDBStoreTest, DeleteRange) {
+    ASSERT_EQ(db->create_and_open(std::cerr), 0);
+    set("O", "a", "1");
+    set("O", "b", "2");
+    set("O", "c", "3");
+    set("O", "d", "4");
+    {
+        auto t = db->get_transaction();
+        t->rm_range_keys("O", "b", "d");
+        ASSERT_EQ(db->submit_transaction_sync(t), 0);
+    }
+    EXPECT_EQ(get("O", "a"), "1");
+    EXPECT_FALSE(get("O", "b").has_value());
+    EXPECT_FALSE(get("O", "c").has_value());
+    EXPECT_EQ(get("O", "d"), "4");
 }
 
-TEST_F(RocksDBTest, IteratorBackward) {
-    OpenDb();
-    ASSERT_TRUE(db_->Put(rocksdb::WriteOptions(), "a", "1").ok());
-    ASSERT_TRUE(db_->Put(rocksdb::WriteOptions(), "b", "2").ok());
-    ASSERT_TRUE(db_->Put(rocksdb::WriteOptions(), "c", "3").ok());
+// ── Transaction ────────────────────────────────────────────────
 
-    auto it = std::unique_ptr<rocksdb::Iterator>(
-        db_->NewIterator(rocksdb::ReadOptions()));
-    it->SeekToLast();
-    std::vector<std::pair<std::string, std::string>> got;
-    for (; it->Valid(); it->Prev())
-        got.emplace_back(it->key().ToString(), it->value().ToString());
+TEST_F(RocksDBStoreTest, TransactionBatch) {
+    ASSERT_EQ(db->create_and_open(std::cerr), 0);
+    auto t = db->get_transaction();
+    t->set("O", "k1", to_bl("v1"));
+    t->set("O", "k2", to_bl("v2"));
+    t->rmkey("O", "k1");
+    ASSERT_EQ(db->submit_transaction_sync(t), 0);
 
-    ASSERT_EQ(got.size(), 3);
-    EXPECT_EQ(got[0].first, "c");
-    EXPECT_EQ(got[1].first, "b");
-    EXPECT_EQ(got[2].first, "a");
+    EXPECT_FALSE(get("O", "k1").has_value());
+    EXPECT_EQ(get("O", "k2"), "v2");
 }
 
-TEST_F(RocksDBTest, IteratorSeek) {
-    OpenDb();
-    ASSERT_TRUE(db_->Put(rocksdb::WriteOptions(), "a", "1").ok());
-    ASSERT_TRUE(db_->Put(rocksdb::WriteOptions(), "b", "2").ok());
-    ASSERT_TRUE(db_->Put(rocksdb::WriteOptions(), "c", "3").ok());
+// ── Iterator ───────────────────────────────────────────────────
 
-    auto it = std::unique_ptr<rocksdb::Iterator>(
-        db_->NewIterator(rocksdb::ReadOptions()));
+TEST_F(RocksDBStoreTest, IteratorSeekToFirst) {
+    ASSERT_EQ(db->create_and_open(std::cerr), 0);
+    set("O", "a", "1");
+    set("O", "b", "2");
 
-    // lower_bound("b") — first key >= "b"
-    it->Seek("b");
-    ASSERT_TRUE(it->Valid());
-    EXPECT_EQ(it->key().ToString(), "b");
-    EXPECT_EQ(it->value().ToString(), "2");
-
-    // upper_bound("b") — first key > "b"
-    it->SeekForPrev("b");
-    ASSERT_TRUE(it->Valid());
-    EXPECT_EQ(it->key().ToString(), "b");
-
-    // Past the end
-    it->Seek("z");
-    EXPECT_FALSE(it->Valid());
+    auto it = db->get_wholespace_iterator();
+    ASSERT_NE(it, nullptr);
+    std::vector<std::string> keys;
+    for (it->seek_to_first(); it->valid(); it->next())
+        keys.push_back(it->key());
+    ASSERT_EQ(keys.size(), 2);
 }
 
-TEST_F(RocksDBTest, IteratorBounds) {
-    OpenDb();
-    ASSERT_TRUE(db_->Put(rocksdb::WriteOptions(), "a", "1").ok());
-    ASSERT_TRUE(db_->Put(rocksdb::WriteOptions(), "b", "2").ok());
-    ASSERT_TRUE(db_->Put(rocksdb::WriteOptions(), "c", "3").ok());
-    ASSERT_TRUE(db_->Put(rocksdb::WriteOptions(), "d", "4").ok());
-
-    rocksdb::ReadOptions ropts;
-    rocksdb::Slice upper("d");
-    ropts.iterate_upper_bound = &upper;
-
-    auto it = std::unique_ptr<rocksdb::Iterator>(
-        db_->NewIterator(ropts));
-    std::vector<std::string> got;
-    for (it->Seek("a"); it->Valid(); it->Next())
-        got.push_back(it->key().ToString());
-
-    ASSERT_EQ(got.size(), 3);
-    EXPECT_EQ(got[0], "a");
-    EXPECT_EQ(got[1], "b");
-    EXPECT_EQ(got[2], "c");
+TEST_F(RocksDBStoreTest, IteratorEmpty) {
+    ASSERT_EQ(db->create_and_open(std::cerr), 0);
+    auto it = db->get_wholespace_iterator();
+    it->seek_to_first();
+    EXPECT_FALSE(it->valid());
 }
 
-// ---------------------------------------------------------------------------
-// WriteBatch (Transaction)
-// ---------------------------------------------------------------------------
-TEST_F(RocksDBTest, WriteBatch) {
-    OpenDb();
-    rocksdb::WriteBatch batch;
-    batch.Put("k1", "v1");
-    batch.Put("k2", "v2");
-    batch.Delete("k1");
+TEST_F(RocksDBStoreTest, IteratorUpperBound) {
+    ASSERT_EQ(db->create_and_open(std::cerr), 0);
+    set("O", "a", "1");
+    set("O", "b", "2");
+    set("O", "c", "3");
+    set("O", "d", "4");
 
-    ASSERT_TRUE(db_->Write(rocksdb::WriteOptions(), &batch).ok());
+    IteratorBounds opts;
+    opts.upper_bound = "d";
+    auto it = db->get_iterator("O", 0, opts);
+    ASSERT_NE(it, nullptr);
 
-    std::string val;
-    EXPECT_TRUE(
-        db_->Get(rocksdb::ReadOptions(), "k1", &val).IsNotFound());
-    EXPECT_TRUE(db_->Get(rocksdb::ReadOptions(), "k2", &val).ok());
-    EXPECT_EQ(val, "v2");
+    it->lower_bound("a");
+    std::vector<std::string> keys;
+    for (; it->valid(); it->next())
+        keys.push_back(it->key());
+    ASSERT_EQ(keys.size(), 3);
+    EXPECT_EQ(keys[0], "a");
+    EXPECT_EQ(keys[1], "b");
+    EXPECT_EQ(keys[2], "c");
 }
 
-TEST_F(RocksDBTest, WriteBatchAtomic) {
-    OpenDb();
-    ASSERT_TRUE(db_->Put(rocksdb::WriteOptions(), "k", "original").ok());
+TEST_F(RocksDBStoreTest, IteratorNocache) {
+    ASSERT_EQ(db->create_and_open(std::cerr), 0);
+    set("O", "a", "1");
+    set("O", "b", "2");
 
-    rocksdb::WriteBatch batch;
-    batch.Put("k", "updated");
-    batch.Delete("nonexistent");  // no-op, fine
-
-    ASSERT_TRUE(db_->Write(rocksdb::WriteOptions(), &batch).ok());
-
-    std::string val;
-    ASSERT_TRUE(db_->Get(rocksdb::ReadOptions(), "k", &val).ok());
-    EXPECT_EQ(val, "updated");
+    auto it = db->get_wholespace_iterator(ITERATOR_NOCACHE);
+    ASSERT_NE(it, nullptr);
+    int count = 0;
+    for (it->seek_to_first(); it->valid(); it->next())
+        count++;
+    EXPECT_EQ(count, 2);
 }
 
-// ---------------------------------------------------------------------------
-// Merge Operator
-// ---------------------------------------------------------------------------
-TEST_F(RocksDBTest, MergeOperator) {
-    OpenDbWithMerge();
+// ── Merge Operator ─────────────────────────────────────────────
+
+TEST_F(RocksDBStoreTest, MergeInt64) {
+    db->set_merge_operator(
+        "T", std::make_shared<Int64ArrayMergeOperator>());
+    ASSERT_EQ(db->create_and_open(std::cerr), 0);
 
     auto write_delta = [&](int64_t v) {
-        std::string val(reinterpret_cast<char *>(&v), sizeof(v));
-        ASSERT_TRUE(
-            db_->Merge(rocksdb::WriteOptions(), "counter", val).ok());
+        auto t = db->get_transaction();
+        bufferlist bl;
+        bl.append(reinterpret_cast<char *>(&v), sizeof(v));
+        t->merge("T", "counter", bl);
+        ASSERT_EQ(db->submit_transaction_sync(t), 0);
     };
 
     write_delta(10);
     write_delta(20);
     write_delta(30);
 
-    std::string result;
-    ASSERT_TRUE(
-        db_->Get(rocksdb::ReadOptions(), "counter", &result).ok());
-    ASSERT_EQ(result.size(), sizeof(int64_t));
-    int64_t sum = *reinterpret_cast<const int64_t *>(result.data());
-    EXPECT_EQ(sum, 60);
+    bufferlist result;
+    ASSERT_EQ(db->get("T", "counter", &result), 0);
+    ASSERT_EQ(result.length(), sizeof(int64_t));
+    auto *sum = reinterpret_cast<const int64_t *>(result.c_str());
+    EXPECT_EQ(*sum, 60);
 }
 
-TEST_F(RocksDBTest, MergeOperatorNonExistent) {
-    OpenDbWithMerge();
+TEST_F(RocksDBStoreTest, MergeNonExistent) {
+    db->set_merge_operator(
+        "T", std::make_shared<Int64ArrayMergeOperator>());
+    ASSERT_EQ(db->create_and_open(std::cerr), 0);
 
     int64_t v = 42;
-    std::string val(reinterpret_cast<char *>(&v), sizeof(v));
-    ASSERT_TRUE(
-        db_->Merge(rocksdb::WriteOptions(), "new_key", val).ok());
+    auto t = db->get_transaction();
+    bufferlist bl;
+    bl.append(reinterpret_cast<char *>(&v), sizeof(v));
+    t->merge("T", "new_key", bl);
+    ASSERT_EQ(db->submit_transaction_sync(t), 0);
 
-    std::string result;
-    ASSERT_TRUE(
-        db_->Get(rocksdb::ReadOptions(), "new_key", &result).ok());
-    ASSERT_EQ(result.size(), sizeof(int64_t));
-    int64_t got = *reinterpret_cast<const int64_t *>(result.data());
-    EXPECT_EQ(got, 42);
+    bufferlist result;
+    ASSERT_EQ(db->get("T", "new_key", &result), 0);
+    ASSERT_EQ(result.length(), sizeof(int64_t));
+    auto *got = reinterpret_cast<const int64_t *>(result.c_str());
+    EXPECT_EQ(*got, 42);
 }
 
-// ---------------------------------------------------------------------------
-// Compact
-// ---------------------------------------------------------------------------
-TEST_F(RocksDBTest, CompactRange) {
-    OpenDb();
-    ASSERT_TRUE(db_->Put(rocksdb::WriteOptions(), "a", "1").ok());
-    ASSERT_TRUE(db_->Put(rocksdb::WriteOptions(), "b", "2").ok());
+TEST_F(RocksDBStoreTest, MergeXor) {
+    db->set_merge_operator(
+        "b", std::make_shared<XorMergeOperator>());
+    ASSERT_EQ(db->create_and_open(std::cerr), 0);
 
-    auto s = db_->CompactRange(rocksdb::CompactRangeOptions(), nullptr,
-                               nullptr);
-    EXPECT_TRUE(s.ok());
-
-    std::string val;
-    ASSERT_TRUE(db_->Get(rocksdb::ReadOptions(), "a", &val).ok());
-    EXPECT_EQ(val, "1");
-}
-
-TEST_F(RocksDBTest, CompactAfterDelete) {
-    OpenDb();
-    ASSERT_TRUE(db_->Put(rocksdb::WriteOptions(), "k", "v").ok());
-    ASSERT_TRUE(db_->Delete(rocksdb::WriteOptions(), "k").ok());
-
-    auto s = db_->CompactRange(rocksdb::CompactRangeOptions(), nullptr,
-                               nullptr);
-    EXPECT_TRUE(s.ok());
-
-    std::string val;
-    EXPECT_TRUE(
-        db_->Get(rocksdb::ReadOptions(), "k", &val).IsNotFound());
-}
-
-// ---------------------------------------------------------------------------
-// Prefix encoding (prefix + '\0' + key)
-// ---------------------------------------------------------------------------
-TEST_F(RocksDBTest, PrefixIteration) {
-    OpenDb();
-
-    auto pk = [&](const std::string &pre, const std::string &k) {
-        return pre + '\0' + k;
+    auto write_xor = [&](const std::string &v) {
+        auto t = db->get_transaction();
+        t->merge("b", "bitmap", to_bl(v));
+        ASSERT_EQ(db->submit_transaction_sync(t), 0);
     };
 
-    ASSERT_TRUE(
-        db_->Put(rocksdb::WriteOptions(), pk("O", "obj1"), "onode1").ok());
-    ASSERT_TRUE(
-        db_->Put(rocksdb::WriteOptions(), pk("O", "obj2"), "onode2").ok());
-    ASSERT_TRUE(
-        db_->Put(rocksdb::WriteOptions(), pk("M", "k1"), "v1").ok());
-    ASSERT_TRUE(
-        db_->Put(rocksdb::WriteOptions(), pk("M", "k2"), "v2").ok());
+    write_xor(std::string("\xff\x00", 2));
+    write_xor(std::string("\x0f\xf0", 2));
 
-    // Scan prefix "M" — keys in ["M\0", "M\1") (since "\0" < "\1")
-    std::string prefix = "M";
-    std::string start = prefix + '\0';
-    std::string end = prefix;
-    end[0]++;
-
-    auto it = std::unique_ptr<rocksdb::Iterator>(
-        db_->NewIterator(rocksdb::ReadOptions()));
-
-    std::vector<std::string> keys;
-    for (it->Seek(start); it->Valid() && it->key().compare(end) < 0;
-         it->Next())
-        keys.push_back(it->key().ToString());
-
-    ASSERT_EQ(keys.size(), 2);
-    EXPECT_EQ(keys[0], pk("M", "k1"));
-    EXPECT_EQ(keys[1], pk("M", "k2"));
+    bufferlist result;
+    ASSERT_EQ(db->get("b", "bitmap", &result), 0);
+    EXPECT_EQ(result.to_str(), std::string("\xf0\xf0", 2));
 }
 
-TEST_F(RocksDBTest, RangeDeleteByPrefix) {
-    OpenDb();
+TEST_F(RocksDBStoreTest, MergeMultiplePrefixes) {
+    db->set_merge_operator(
+        "T", std::make_shared<Int64ArrayMergeOperator>());
+    db->set_merge_operator(
+        "b", std::make_shared<XorMergeOperator>());
+    ASSERT_EQ(db->create_and_open(std::cerr), 0);
 
-    auto pk = [&](const std::string &pre, const std::string &k) {
-        return pre + '\0' + k;
-    };
+    int64_t v = 10;
+    auto t1 = db->get_transaction();
+    bufferlist bl;
+    bl.append(reinterpret_cast<char *>(&v), sizeof(v));
+    t1->merge("T", "stat", bl);
+    t1->merge("b", "bmap", to_bl(std::string("\x0f", 1)));
+    ASSERT_EQ(db->submit_transaction_sync(t1), 0);
 
-    ASSERT_TRUE(
-        db_->Put(rocksdb::WriteOptions(), pk("O", "keep"), "ok").ok());
-    ASSERT_TRUE(
-        db_->Put(rocksdb::WriteOptions(), pk("M", "del1"), "bye").ok());
-    ASSERT_TRUE(
-        db_->Put(rocksdb::WriteOptions(), pk("M", "del2"), "bye").ok());
+    bufferlist stat_val;
+    ASSERT_EQ(db->get("T", "stat", &stat_val), 0);
+    ASSERT_EQ(stat_val.length(), sizeof(int64_t));
+    EXPECT_EQ(*reinterpret_cast<const int64_t *>(stat_val.c_str()), 10);
 
-    std::string prefix = "M";
-    std::string start = prefix + '\0';
-    std::string end = prefix;
-    end[0]++;
-
-    rocksdb::WriteBatch batch;
-    batch.DeleteRange(start, end);
-    ASSERT_TRUE(db_->Write(rocksdb::WriteOptions(), &batch).ok());
-
-    std::string val;
-    EXPECT_TRUE(
-        db_->Get(rocksdb::ReadOptions(), pk("O", "keep"), &val).ok());
-    EXPECT_TRUE(
-        db_->Get(rocksdb::ReadOptions(), pk("M", "del1"), &val).IsNotFound());
-    EXPECT_TRUE(
-        db_->Get(rocksdb::ReadOptions(), pk("M", "del2"), &val).IsNotFound());
+    bufferlist bmap_val;
+    ASSERT_EQ(db->get("b", "bmap", &bmap_val), 0);
+    EXPECT_EQ(bmap_val.to_str(), std::string("\x0f", 1));
 }
 
-// ---------------------------------------------------------------------------
-// MultiGet
-// ---------------------------------------------------------------------------
-TEST_F(RocksDBTest, MultiGet) {
-    OpenDb();
-    ASSERT_TRUE(db_->Put(rocksdb::WriteOptions(), "a", "1").ok());
-    ASSERT_TRUE(db_->Put(rocksdb::WriteOptions(), "b", "2").ok());
+// ── Compact ────────────────────────────────────────────────────
 
-    std::vector<rocksdb::Slice> keys = {"a", "b", "c"};
-    std::vector<std::string> vals(3);
-    std::vector<rocksdb::Status> statuses =
-        db_->MultiGet(rocksdb::ReadOptions(), keys, &vals);
+TEST_F(RocksDBStoreTest, Compact) {
+    ASSERT_EQ(db->create_and_open(std::cerr), 0);
+    set("O", "a", "1");
+    set("O", "b", "2");
 
-    ASSERT_TRUE(statuses[0].ok());
-    EXPECT_EQ(vals[0], "1");
-    ASSERT_TRUE(statuses[1].ok());
-    EXPECT_EQ(vals[1], "2");
-    ASSERT_TRUE(statuses[2].IsNotFound());
+    db->compact();
+    EXPECT_EQ(get("O", "a"), "1");
+    EXPECT_EQ(get("O", "b"), "2");
 }
 
-// ---------------------------------------------------------------------------
-// Reopen persistence
-// ---------------------------------------------------------------------------
-TEST_F(RocksDBTest, ReopenPersists) {
-    {
-        OpenDb();
-        ASSERT_TRUE(
-            db_->Put(rocksdb::WriteOptions(), "persist", "data").ok());
-        delete db_;
-        db_ = nullptr;
-    }
-    {
-        rocksdb::Options opts;
-        opts.create_if_missing = false;
-        auto s = rocksdb::DB::Open(opts, dbpath_, &db_);
-        ASSERT_TRUE(s.ok());
+// ── Estimated Size ─────────────────────────────────────────────
 
-        std::string val;
-        ASSERT_TRUE(
-            db_->Get(rocksdb::ReadOptions(), "persist", &val).ok());
-        EXPECT_EQ(val, "data");
-    }
+TEST_F(RocksDBStoreTest, EstimatedSize) {
+    ASSERT_EQ(db->create_and_open(std::cerr), 0);
+    set("O", "k", "v");
+    db->compact();
+
+    std::map<std::string, uint64_t> extra;
+    auto size = db->get_estimated_size(extra);
+    EXPECT_GT(size, 0);
 }
+
+}  // namespace
