@@ -27,6 +27,7 @@ enable_testing()
 
 # --- Build options: -DTEST=ON/OFF controls test compilation ---
 option(TEST "Build and run tests" ON)
+option(EXAMPLE "Build and run examples" ON)
 
 # --- System dependencies (Boost, fmt, ...) ---
 include(FindDependencies)
@@ -45,6 +46,11 @@ add_subdirectory(blk)
 
 # --- KV storage library ---
 add_subdirectory(kv)
+
+# --- Examples ---
+if(EXAMPLE)
+    add_subdirectory(examples)
+endif()
 
 # --- Tests ---
 if(TEST)

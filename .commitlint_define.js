@@ -27,5 +27,6 @@ const scopeDef = [
     'common',
     'blk',
     'kv',
+    'example',
     'test'
 ]
