@@ -35,6 +35,7 @@ include(FindDependencies)
 include(BuildGoogleTest)
 include(BuildSpdlog)
 include(BuildISAL)
+include(BuildRocksDB)
 
 # --- Common library ---
 add_subdirectory(common)

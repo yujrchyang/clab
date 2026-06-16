@@ -7,3 +7,6 @@
 [submodule "third_party/isa-l"]
 	path = third_party/isa-l
 	url = https://github.com/intel/isa-l
+[submodule "third_party/rocksdb"]
+	path = third_party/rocksdb
+	url = https://github.com/facebook/rocksdb
