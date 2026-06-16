@@ -3,7 +3,6 @@
 
 #include <cstdlib>
 #include <cstring>
-#include <filesystem>
 #include <string>
 
 #include <rocksdb/db.h>
@@ -13,13 +12,14 @@
 #include <rocksdb/utilities/write_batch_with_index.h>
 #include <rocksdb/write_batch.h>
 
-namespace fs = std::filesystem;
+#include "clab_test.h"
 
 static std::string tmpdir() {
-    auto build_dir = fs::current_path();
-    auto d = build_dir / "test_rocksdb_tmp";
-    fs::create_directories(d);
-    return d.string();
+    auto tmpl = clab_tmp_dir("rocksdb");
+    char *buf = tmpl.data();
+    if (!mkdtemp(buf))
+        return {};
+    return buf;
 }
 
 // ---------------------------------------------------------------------------
@@ -74,14 +74,13 @@ protected:
     rocksdb::DB *db_ = nullptr;
 
     void SetUp() override {
-        dbpath_ = tmpdir() + "/rocksdb_test_" + std::to_string(getpid()) + "_"
-                  + std::to_string(rand());
-        fs::remove_all(dbpath_);
+        dbpath_ = tmpdir();
+        ASSERT_FALSE(dbpath_.empty()) << "mkdtemp failed";
     }
 
     void TearDown() override {
         delete db_;
-        fs::remove_all(dbpath_);
+        std::filesystem::remove_all(dbpath_);
     }
 
     void OpenDb() {

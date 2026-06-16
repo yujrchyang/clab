@@ -3,6 +3,7 @@ target_include_directories(test_rocksdb PRIVATE ${PROJECT_SOURCE_DIR})
 target_link_libraries(test_rocksdb
     PRIVATE
         RocksDB::RocksDB
+        clab_test_helpers
         GTest::gtest_main
         pthread
         dl

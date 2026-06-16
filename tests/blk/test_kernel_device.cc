@@ -12,6 +12,7 @@
 #include "blk/block_device.h"
 #include "blk/io_context.h"
 #include "blk/kernel_device.h"
+#include "clab_test.h"
 
 using TOPNSPC::bufferlist;
 
@@ -24,9 +25,10 @@ protected:
     static constexpr uint64_t kFileSize = 4 << 20;  // 4 MiB
 
     void SetUp() override {
-        char path[] = "/tmp/kernel_device_test_XXXXXX";
-        tmp_fd_ = ::mkstemp(path);
+        auto tmpl = clab_tmp_path("kernel_device");
+        tmp_fd_ = ::mkstemp(tmpl.data());
         ASSERT_GE(tmp_fd_, 0) << "mkstemp failed";
+        tmp_path_ = tmpl;
 
         // Allocate file
         int r = ::fallocate(tmp_fd_, 0, 0, kFileSize);
@@ -38,7 +40,6 @@ protected:
                          std::min<uint64_t>(zeros.size(), kFileSize - off), off);
             }
         }
-        tmp_path_ = path;
     }
 
     void TearDown() override {

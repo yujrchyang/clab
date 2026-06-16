@@ -1,0 +1,23 @@
+#pragma once
+
+#include <filesystem>
+#include <string>
+
+// Root directory for all test temporary files (under build/)
+#define CLAB_TEST_DIR "@CMAKE_BINARY_DIR@/test_tmp"
+
+// Return a unique file path template suitable for mkstemp.
+// The returned string ends with "_<name>_XXXXXX".
+inline std::string clab_tmp_path(const char *name) {
+    auto dir = std::filesystem::path(CLAB_TEST_DIR);
+    std::filesystem::create_directories(dir);
+    return (dir / ("clab_" + std::string(name))).string() + "_XXXXXX";
+}
+
+// Return a unique directory path template suitable for mkdtemp.
+// The returned string ends with "_<name>_XXXXXX".
+inline std::string clab_tmp_dir(const char *name) {
+    auto dir = std::filesystem::path(CLAB_TEST_DIR);
+    std::filesystem::create_directories(dir);
+    return (dir / ("clab_" + std::string(name))).string() + "_XXXXXX";
+}

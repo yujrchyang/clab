@@ -8,16 +8,17 @@
 #include <vector>
 
 #include "blk/aio.h"
+#include "clab_test.h"
 
 class AioTest : public ::testing::Test {
 protected:
     int fd_ = -1;
 
     void SetUp() override {
-        char tmpl[] = "/tmp/clab_aio_test_XXXXXX";
-        fd_ = mkstemp(tmpl);
+        auto tmpl = clab_tmp_path("aio");
+        fd_ = mkstemp(tmpl.data());
         ASSERT_GE(fd_, 0) << "mkstemp failed";
-        unlink(tmpl);
+        ASSERT_EQ(0, unlink(tmpl.c_str()));
         ASSERT_EQ(ftruncate(fd_, 1048576), 0);
     }
 
