@@ -38,6 +38,46 @@ Implement the kv abstraction layer for clab (RocksDBStore backend, MemDB debug b
 - kv/ compiles as SHARED library (`libkv.so`), links `common` (PUBLIC) + `RocksDB::RocksDB` (PRIVATE)
 - `kv/CMakeLists.txt` uses `-Wno-unused-parameter` due to RocksDB callback signatures
 
+### Serialization: `common/denc.h` (DENC framework)
+
+`common/denc.h` 是一个基于 traits 模板的编译期序列化框架，统一通过 `denc(o, p)` 入口调度 encode/decode。使用规则：
+
+- **POD 定长类型**（uint64_t, int32_t 等用于 FreelistManager meta）：直接用 `bl.append((const char*)&v, sizeof(v))` / `p.copy(...)` 即可，不需要 `denc.h`
+- **简单容器**（`vector<T>` 等）或 `string`：直接 `#include "common/denc.h"`，模板已内置支持
+- **自定义复合类型**（onode_t、extent_map 等复杂的 BlueStore 结构化数据）：用 `WRITE_CLASS_DENC(T)` 宏或 `DENC(Type, v, p)` 宏实现成员级序列化，在 `topnspc` 命名空间内使用
+
+用法示例：
+```cpp
+#include "common/denc.h"
+
+// 方式 A: DENC 宏（推荐，结构体内联）
+struct Extent {
+    uint64_t offset;
+    uint32_t length;
+    DENC(Extent, v, p) {
+        DENC_START(1, 1, p);
+        denc(v.offset, p);
+        denc(v.length, p);
+        DENC_FINISH(p);
+    }
+};
+
+// 方式 B: WRITE_CLASS_DENC（traits 特化）
+struct Blob {
+    uint64_t id;
+    // 需定义 encode() / decode() / bound_encode() 成员
+};
+WRITE_CLASS_DENC(Blob);  // 在 topnspc 内
+
+// 使用
+bufferlist bl;
+encode(extent, bl);       // denc(o, p) 顶层包装
+Extent e;
+decode(e, bl.cbegin());   // denc(o, p) 顶层包装
+```
+
+简单原则：**只有 uint64/int/string 等简单字段时直接手动序列化；出现嵌套结构体组合（onode_t 含多个成员 + map + vector）时上 DENC**。
+
 ### Done
 - **RocksDBStore implementation:**
   - `RDBTransactionImpl`: builds `rocksdb::WriteBatch`, submitted via `db_->Write()` / `db_->Write({.sync=true})`
@@ -93,3 +133,9 @@ Implement the kv abstraction layer for clab (RocksDBStore backend, MemDB debug b
 - `tests/kv/test_memdb.cc`: 36 MemDB tests
 - `tests/kv/CMakeLists.txt`: test targets linking kv + RocksDB + clab_test_helpers + GTest
 - `docs/kv-design.md`: full design specification
+- `docs/freelist-manager-design.md`: FreelistManager/BitmapFreelistManager design analysis (Ceph reference: `src/os/bluestore/FreelistManager.*`, `BitmapFreelistManager.*`)
+
+### Next Steps (updated)
+- Implement FreelistManager / BitmapFreelistManager in `bluestore/` layer
+- Implement Allocator (StupidAllocator / BitmapAllocator)
+- BlueStore core engine with KV + FreelistManager + Allocator integration
