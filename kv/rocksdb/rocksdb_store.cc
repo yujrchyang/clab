@@ -20,19 +20,20 @@
 
 #include "common/buffer.h"
 
-namespace kv {
+namespace TOPNSPC {
 
 // =====================================================================
 // RocksDBMergeAdapter — dispatches kv::MergeOperator calls by prefix
 // =====================================================================
 
 class RocksDBStore::RocksDBMergeAdapter : public ::rocksdb::MergeOperator {
-    using KvMergeOp = kv::MergeOperator;
+    using KvMergeOp = TOPNSPC::MergeOperator;
 
 public:
     explicit RocksDBMergeAdapter(
         std::vector<std::pair<std::string,
-                               std::shared_ptr<KvMergeOp>>> ops)
+                              std::shared_ptr<KvMergeOp>>>
+            ops)
         : merge_ops_(std::move(ops)) {}
 
     const char *Name() const override { return "clab_kv_merge_adapter"; }
@@ -57,7 +58,7 @@ public:
 
         if (!existing) {
             mop->merge_nonexistent(operands[0].data(), operands[0].size(),
-                                    &merge_out->new_value);
+                                   &merge_out->new_value);
             for (size_t i = 1; i < operands.size(); i++) {
                 std::string tmp;
                 mop->merge(merge_out->new_value.data(),
@@ -81,9 +82,9 @@ public:
     }
 
     bool PartialMergeMulti(const ::rocksdb::Slice &key,
-                            const std::deque<::rocksdb::Slice> &operand_list,
-                            std::string *new_value,
-                            ::rocksdb::Logger *logger) const override {
+                           const std::deque<::rocksdb::Slice> &operand_list,
+                           std::string *new_value,
+                           ::rocksdb::Logger *logger) const override {
         (void)key;
         (void)operand_list;
         (void)new_value;
@@ -116,7 +117,7 @@ struct RocksDBStore::RDBTransactionImpl : public TransactionImpl {
         : delete_range_threshold(dr_threshold) {}
 
     void set(const std::string &prefix, const std::string &k,
-             const TOPNSPC::bufferlist &bl) override {
+             const bufferlist &bl) override {
         auto s = bl.to_str();
         batch.Put(encode_key(prefix, k), ::rocksdb::Slice(s));
     }
@@ -154,7 +155,7 @@ struct RocksDBStore::RDBTransactionImpl : public TransactionImpl {
     }
 
     void merge(const std::string &prefix, const std::string &k,
-               const TOPNSPC::bufferlist &value) override {
+               const bufferlist &value) override {
         auto s = value.to_str();
         batch.Merge(encode_key(prefix, k), ::rocksdb::Slice(s));
     }
@@ -168,7 +169,7 @@ class RocksDBStore::RDBWholeSpaceIteratorImpl
     : public WholeSpaceIteratorImpl {
 public:
     RDBWholeSpaceIteratorImpl(::rocksdb::DB *db,
-                               ::rocksdb::ReadOptions ropts)
+                              ::rocksdb::ReadOptions ropts)
         : it_(db->NewIterator(ropts)), ropts_(std::move(ropts)) {}
 
     int seek_to_first() override {
@@ -217,8 +218,8 @@ public:
         return it_->key().ToString();
     }
 
-    TOPNSPC::bufferlist value() const override {
-        TOPNSPC::bufferlist bl;
+    bufferlist value() const override {
+        bufferlist bl;
         auto v = it_->value();
         bl.append(v.data(), static_cast<unsigned>(v.size()));
         return bl;
@@ -275,7 +276,7 @@ RocksDBStore::RocksDBStore(
     : dir_(dir), options_(std::move(options)) {}
 
 static void parse_options(const std::string &str,
-                           ::rocksdb::Options &opts) {
+                          ::rocksdb::Options &opts) {
     if (str.empty())
         return;
     std::istringstream ss(str);
@@ -310,7 +311,7 @@ int RocksDBStore::init(const std::string &options_str) {
 }
 
 int RocksDBStore::open_db(::rocksdb::Options opts,
-                           std::ostream &out) {
+                          std::ostream &out) {
     // Apply cached options from init()
     opts.write_buffer_size = cached_opts_.write_buffer_size;
     opts.max_write_buffer_number = cached_opts_.max_write_buffer_number;
@@ -409,7 +410,7 @@ int RocksDBStore::set_merge_operator(
 int RocksDBStore::get(
     const std::string &prefix,
     const std::set<std::string> &keys,
-    std::map<std::string, TOPNSPC::bufferlist> *out) {
+    std::map<std::string, bufferlist> *out) {
     std::vector<std::string> full_keys;
     full_keys.reserve(keys.size());
     for (auto &k : keys)
@@ -427,7 +428,7 @@ int RocksDBStore::get(
     auto kit = keys.begin();
     while (kit != keys.end() && i < statuses.size()) {
         if (statuses[i].ok()) {
-            TOPNSPC::bufferlist bl;
+            bufferlist bl;
             bl.append(values[i].data(),
                       static_cast<unsigned>(values[i].size()));
             (*out)[*kit] = std::move(bl);
@@ -449,7 +450,7 @@ WholeSpaceIterator RocksDBStore::get_wholespace_iterator(
 
 void RocksDBStore::compact() {
     auto s = db_->CompactRange(::rocksdb::CompactRangeOptions(),
-                                nullptr, nullptr);
+                               nullptr, nullptr);
     (void)s;
 }
 
@@ -462,8 +463,8 @@ void RocksDBStore::compact_prefix(const std::string &prefix) {
 }
 
 void RocksDBStore::compact_range(const std::string &prefix,
-                                  const std::string &start,
-                                  const std::string &end) {
+                                 const std::string &start,
+                                 const std::string &end) {
     auto b = encode_key(prefix, start);
     auto e = encode_key(prefix, end);
     ::rocksdb::Slice bs(b), es(e);
@@ -485,7 +486,7 @@ uint64_t RocksDBStore::get_estimated_size(
 // ── Helpers ──────────────────────────────────────────────────────
 
 std::string RocksDBStore::encode_key(const std::string &prefix,
-                                      const std::string &key) {
+                                     const std::string &key) {
     return prefix + '\0' + key;
 }
 
@@ -497,4 +498,4 @@ std::pair<std::string, std::string> RocksDBStore::decode_key(
     return {full_key.substr(0, pos), full_key.substr(pos + 1)};
 }
 
-}  // namespace kv
+}  // namespace TOPNSPC

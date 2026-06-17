@@ -7,6 +7,9 @@
 #include <mutex>
 
 #include "blk/aio.h"
+#include "common/common_fwd.h"
+
+namespace TOPNSPC {
 
 /// track in-flight io
 struct IOContext {
@@ -39,5 +42,7 @@ struct IOContext {
     void set_return_value(int _r) { r = _r; }
     int get_return_value() const { return r; }
 };
+
+}  // namespace TOPNSPC
 
 #endif  // BLK_IO_CONTEXT_H

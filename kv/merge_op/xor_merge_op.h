@@ -6,7 +6,7 @@
 
 #include "kv/merge_op/merge_op.h"
 
-namespace kv {
+namespace TOPNSPC {
 
 class XorMergeOperator : public MergeOperator {
 public:
@@ -28,4 +28,4 @@ public:
     }
 };
 
-}  // namespace kv
+}  // namespace TOPNSPC

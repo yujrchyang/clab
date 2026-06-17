@@ -14,13 +14,17 @@
 #include "common/buffer.h"
 #include "common/common_fwd.h"
 
-namespace kv {
+namespace TOPNSPC {
 
 // =====================================================================
 // MDBTransactionImpl
 // =====================================================================
 
-enum class OpType { SET, RMKEY, RMKEY_BY_PREFIX, RM_RANGE_KEYS, MERGE };
+enum class OpType { SET,
+                    RMKEY,
+                    RMKEY_BY_PREFIX,
+                    RM_RANGE_KEYS,
+                    MERGE };
 
 struct MemDB::MDBTransactionImpl : public TransactionImpl {
     struct Op {
@@ -28,12 +32,12 @@ struct MemDB::MDBTransactionImpl : public TransactionImpl {
         std::string prefix;
         std::string key;
         std::string end;
-        TOPNSPC::bufferlist value;
+        bufferlist value;
     };
     std::vector<Op> ops;
 
     void set(const std::string &prefix, const std::string &k,
-             const TOPNSPC::bufferlist &bl) override {
+             const bufferlist &bl) override {
         ops.push_back({OpType::SET, prefix, k, {}, bl});
     }
 
@@ -54,7 +58,7 @@ struct MemDB::MDBTransactionImpl : public TransactionImpl {
     }
 
     void merge(const std::string &prefix, const std::string &k,
-               const TOPNSPC::bufferlist &value) override {
+               const bufferlist &value) override {
         ops.push_back({OpType::MERGE, prefix, k, {}, value});
     }
 };
@@ -68,9 +72,8 @@ public:
     using Items = std::vector<std::pair<std::string, std::string>>;
 
     MDBWholeSpaceIteratorImpl(const MemDB *db, Items items,
-                               uint64_t seqno)
-        : db_(db), items_(std::move(items)), seqno_(seqno),
-          pos_(-1) {}
+                              uint64_t seqno)
+        : db_(db), items_(std::move(items)), seqno_(seqno), pos_(-1) {}
 
     int seek_to_first() override {
         refresh();
@@ -122,7 +125,7 @@ public:
 
     bool valid() const override {
         return pos_ >= 0 &&
-               pos_ < static_cast<ptrdiff_t>(items_.size());
+            pos_ < static_cast<ptrdiff_t>(items_.size());
     }
 
     int next() override {
@@ -147,11 +150,12 @@ public:
 
     std::string key() const override {
         return decode_key(
-            items_[static_cast<size_t>(pos_)].first).second;
+                   items_[static_cast<size_t>(pos_)].first)
+            .second;
     }
 
-    TOPNSPC::bufferlist value() const override {
-        TOPNSPC::bufferlist bl;
+    bufferlist value() const override {
+        bufferlist bl;
         const auto &v = items_[static_cast<size_t>(pos_)].second;
         bl.append(v.data(), static_cast<unsigned>(v.size()));
         return bl;
@@ -265,13 +269,13 @@ int MemDB::submit_transaction(Transaction t) {
 int MemDB::get(
     const std::string &prefix,
     const std::set<std::string> &keys,
-    std::map<std::string, TOPNSPC::bufferlist> *out) {
+    std::map<std::string, bufferlist> *out) {
     std::lock_guard<std::mutex> lock(m_lock_);
     for (auto &k : keys) {
         auto full = encode_key(prefix, k);
         auto it = db_.find(full);
         if (it != db_.end()) {
-            TOPNSPC::bufferlist bl;
+            bufferlist bl;
             bl.append(it->second.data(), it->second.size());
             (*out)[k] = std::move(bl);
         }
@@ -317,7 +321,7 @@ std::pair<std::string, std::string> MemDB::decode_key(
 }
 
 void MemDB::_set_key(const std::string &full_key,
-                     const TOPNSPC::bufferlist &bl) {
+                     const bufferlist &bl) {
     db_[full_key] = bl.to_str();
     ++seqno_;
 }
@@ -348,8 +352,8 @@ void MemDB::_rm_range_keys(const std::string &prefix,
 }
 
 int MemDB::_merge(const std::string &prefix,
-                   const std::string &full_key,
-                   const TOPNSPC::bufferlist &bl) {
+                  const std::string &full_key,
+                  const bufferlist &bl) {
     auto &mops = get_merge_ops();
     std::shared_ptr<MergeOperator> mop;
     for (auto &[p, op] : mops) {
@@ -377,4 +381,4 @@ int MemDB::_merge(const std::string &prefix,
     return 0;
 }
 
-}  // namespace kv
+}  // namespace TOPNSPC

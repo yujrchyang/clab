@@ -8,6 +8,8 @@
 // and aio_t has no virtual functions, so the reinterpret_cast in
 // get_next_completed is valid on all supported compilers (same as Ceph).
 
+namespace TOPNSPC {
+
 // ---------------------------------------------------------------------------
 // aio_t
 // ---------------------------------------------------------------------------
@@ -117,3 +119,5 @@ int aio_queue_t::get_next_completed(int timeout_ms,
     }
     return r;
 }
+
+}  // namespace TOPNSPC

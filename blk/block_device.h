@@ -9,6 +9,9 @@
 #include <vector>
 
 #include "common/buffer_fwd.h"
+#include "common/common_fwd.h"
+
+namespace TOPNSPC {
 
 struct IOContext;
 
@@ -44,19 +47,19 @@ public:
 
     // Synchronous IO
     virtual int read(uint64_t off, uint64_t len,
-                     TOPNSPC::bufferlist *pbl, IOContext *ioc,
+                     bufferlist *pbl, IOContext *ioc,
                      bool buffered) = 0;
     virtual int read_random(uint64_t off, uint64_t len,
                             char *buf, bool buffered) = 0;
-    virtual int write(uint64_t off, TOPNSPC::bufferlist &bl,
+    virtual int write(uint64_t off, bufferlist &bl,
                       bool buffered,
                       int write_hint = WRITE_LIFE_NOT_SET) = 0;
     virtual int flush() = 0;
 
     // Async IO
     virtual int aio_read(uint64_t off, uint64_t len,
-                         TOPNSPC::bufferlist *pbl, IOContext *ioc) = 0;
-    virtual int aio_write(uint64_t off, TOPNSPC::bufferlist &bl,
+                         bufferlist *pbl, IOContext *ioc) = 0;
+    virtual int aio_write(uint64_t off, bufferlist &bl,
                           IOContext *ioc, bool buffered,
                           int write_hint = WRITE_LIFE_NOT_SET) = 0;
     virtual void aio_submit(IOContext *ioc) = 0;
@@ -89,5 +92,7 @@ protected:
     bool support_discard_ = false;
     bool rotational = true;
 };
+
+}  // namespace TOPNSPC
 
 #endif  // BLK_BLOCK_DEVICE_H

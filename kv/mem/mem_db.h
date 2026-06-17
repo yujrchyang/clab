@@ -10,7 +10,7 @@
 
 #include "kv/key_value_db.h"
 
-namespace kv {
+namespace TOPNSPC {
 
 class MemDB : public KeyValueDB {
 public:
@@ -26,7 +26,7 @@ public:
 
     int get(const std::string &prefix,
             const std::set<std::string> &keys,
-            std::map<std::string, TOPNSPC::bufferlist> *out) override;
+            std::map<std::string, bufferlist> *out) override;
 
     WholeSpaceIterator get_wholespace_iterator(
         IteratorOpts opts) override;
@@ -48,19 +48,19 @@ private:
         const std::string &full_key);
 
     void _set_key(const std::string &full_key,
-                  const TOPNSPC::bufferlist &bl);
+                  const bufferlist &bl);
     void _rmkey(const std::string &full_key);
     void _rmkeys_by_prefix(const std::string &prefix);
     void _rm_range_keys(const std::string &prefix,
                         const std::string &start,
                         const std::string &end);
     int _merge(const std::string &prefix,
-                const std::string &full_key,
-                const TOPNSPC::bufferlist &bl);
+               const std::string &full_key,
+               const bufferlist &bl);
 
     mutable std::mutex m_lock_;
     std::map<std::string, std::string> db_;
     uint64_t seqno_ = 0;
 };
 
-}  // namespace kv
+}  // namespace TOPNSPC

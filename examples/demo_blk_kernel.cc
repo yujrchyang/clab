@@ -17,7 +17,7 @@
 #include "blk/io_context.h"
 #include "common/buffer.h"
 
-using TOPNSPC::bufferlist;
+using namespace TOPNSPC;
 
 static constexpr uint64_t kFileSize = 4 << 20;  // 4 MiB
 

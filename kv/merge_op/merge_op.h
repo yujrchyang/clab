@@ -4,7 +4,7 @@
 
 #include "common/common_fwd.h"
 
-namespace kv {
+namespace TOPNSPC {
 
 class MergeOperator {
 public:
@@ -20,4 +20,4 @@ public:
     virtual const char *name() const = 0;
 };
 
-}  // namespace kv
+}  // namespace TOPNSPC

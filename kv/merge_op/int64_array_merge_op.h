@@ -7,7 +7,7 @@
 
 #include "kv/merge_op/merge_op.h"
 
-namespace kv {
+namespace TOPNSPC {
 
 class Int64ArrayMergeOperator : public MergeOperator {
 public:
@@ -34,4 +34,4 @@ public:
     }
 };
 
-}  // namespace kv
+}  // namespace TOPNSPC

@@ -12,7 +12,7 @@
 
 #include "kv/key_value_db.h"
 
-namespace kv {
+namespace TOPNSPC {
 
 class RocksDBStore : public KeyValueDB {
 public:
@@ -32,7 +32,7 @@ public:
 
     int get(const std::string &prefix,
             const std::set<std::string> &keys,
-            std::map<std::string, TOPNSPC::bufferlist> *out) override;
+            std::map<std::string, bufferlist> *out) override;
 
     WholeSpaceIterator get_wholespace_iterator(
         IteratorOpts opts) override;
@@ -44,8 +44,8 @@ public:
     void compact() override;
     void compact_prefix(const std::string &prefix) override;
     void compact_range(const std::string &prefix,
-                        const std::string &start,
-                        const std::string &end) override;
+                       const std::string &start,
+                       const std::string &end) override;
 
     uint64_t get_estimated_size(
         std::map<std::string, uint64_t> &extra) override;
@@ -73,4 +73,4 @@ private:
     rocksdb::Options cached_opts_;
 };
 
-}  // namespace kv
+}  // namespace TOPNSPC

@@ -14,7 +14,7 @@
 #include "blk/kernel_device.h"
 #include "clab_test.h"
 
-using TOPNSPC::bufferlist;
+using namespace TOPNSPC;
 
 // Temp-file fixture: creates a 4 MiB temp file, opens with KernelDevice,
 // destroys on teardown.

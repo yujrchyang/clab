@@ -17,11 +17,9 @@
 #include "kv/merge_op/int64_array_merge_op.h"
 #include "kv/merge_op/xor_merge_op.h"
 
-using namespace kv;
+using namespace TOPNSPC;
 
 namespace {
-
-using TOPNSPC::bufferlist;
 
 static std::string tmpdir() {
     auto tmpl = clab_tmp_dir("rocksdb");
@@ -62,7 +60,7 @@ protected:
     }
 
     std::optional<std::string> get(const std::string &prefix,
-                                    const std::string &key) {
+                                   const std::string &key) {
         bufferlist bl;
         int r = db->get(prefix, key, &bl);
         if (r != 0) return std::nullopt;

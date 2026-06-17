@@ -10,7 +10,7 @@
 #include "common/buffer.h"
 #include "kv/merge_op/merge_op.h"
 
-namespace kv {
+namespace TOPNSPC {
 
 // ---------------------------------------------------------------------------
 // TransactionImpl
@@ -18,11 +18,11 @@ namespace kv {
 struct TransactionImpl {
     virtual void set(const std::string &prefix,
                      const std::string &k,
-                     const TOPNSPC::bufferlist &bl) = 0;
+                     const bufferlist &bl) = 0;
 
     virtual void set(const std::string &prefix,
                      const char *k, size_t klen,
-                     const TOPNSPC::bufferlist &bl) {
+                     const bufferlist &bl) {
         set(prefix, std::string(k, klen), bl);
     }
 
@@ -49,7 +49,7 @@ struct TransactionImpl {
 
     virtual void merge(const std::string &prefix,
                        const std::string &k,
-                       const TOPNSPC::bufferlist &value) = 0;
+                       const bufferlist &value) = 0;
 
     virtual ~TransactionImpl() = default;
 };
@@ -79,7 +79,7 @@ public:
     virtual int prev() = 0;
 
     virtual std::string key() const = 0;
-    virtual TOPNSPC::bufferlist value() const = 0;
+    virtual bufferlist value() const = 0;
 
     virtual int status() const = 0;
 
@@ -140,7 +140,7 @@ public:
     int prev() override;
 
     std::string key() const override;
-    TOPNSPC::bufferlist value() const override;
+    bufferlist value() const override;
 
     int status() const override;
 
@@ -189,11 +189,11 @@ public:
     // ── Point Read ──────────────────────────────────────────
     virtual int get(const std::string &prefix,
                     const std::set<std::string> &keys,
-                    std::map<std::string, TOPNSPC::bufferlist> *out) = 0;
+                    std::map<std::string, bufferlist> *out) = 0;
 
     virtual int get(const std::string &prefix,
                     const std::string &key,
-                    TOPNSPC::bufferlist *out);
+                    bufferlist *out);
 
     // ── Iterator ────────────────────────────────────────────
     virtual WholeSpaceIterator get_wholespace_iterator(
@@ -221,16 +221,16 @@ public:
         compact_async();
     }
     virtual void compact_range(const std::string &prefix,
-                                const std::string &start,
-                                const std::string &end) {
+                               const std::string &start,
+                               const std::string &end) {
         (void)prefix;
         (void)start;
         (void)end;
         compact();
     }
     virtual void compact_range_async(const std::string &prefix,
-                                      const std::string &start,
-                                      const std::string &end) {
+                                     const std::string &start,
+                                     const std::string &end) {
         compact_range(prefix, start, end);
     }
 
@@ -253,4 +253,4 @@ private:
         merge_ops_;
 };
 
-}  // namespace kv
+}  // namespace TOPNSPC

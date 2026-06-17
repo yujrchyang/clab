@@ -10,6 +10,8 @@
 #include "blk/aio.h"
 #include "clab_test.h"
 
+using namespace TOPNSPC;
+
 class AioTest : public ::testing::Test {
 protected:
     int fd_ = -1;

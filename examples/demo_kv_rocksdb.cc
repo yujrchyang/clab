@@ -9,8 +9,7 @@
 #include "common/buffer.h"
 #include "kv/key_value_db.h"
 
-using namespace kv;
-using TOPNSPC::bufferlist;
+using namespace TOPNSPC;
 
 static std::string tmpdir() {
     auto path = std::filesystem::temp_directory_path() / "rocksdb_demo_XXXXXX";
@@ -33,9 +32,9 @@ int main() {
 
     // 2. Write — all mutations go through a transaction
     auto t = db->get_transaction();
-    t->set("P", "foo", bufferlist());           // key "foo" under prefix "P"
+    t->set("P", "foo", bufferlist());  // key "foo" under prefix "P"
     t->set("P", "bar", bufferlist());
-    t->rmkey("P", "baz");                       // delete a key
+    t->rmkey("P", "baz");  // delete a key
     r = db->submit_transaction_sync(t);
     assert(r == 0);
 

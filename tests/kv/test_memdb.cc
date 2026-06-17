@@ -13,11 +13,9 @@
 #include "kv/merge_op/int64_array_merge_op.h"
 #include "kv/merge_op/xor_merge_op.h"
 
-using namespace kv;
+using namespace TOPNSPC;
 
 namespace {
-
-using TOPNSPC::bufferlist;
 
 // ---------------------------------------------------------------------------
 // Helpers

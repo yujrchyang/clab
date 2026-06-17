@@ -12,7 +12,7 @@
 #include "blk/aio.h"
 #include "blk/io_context.h"
 
-using TOPNSPC::bufferlist;
+namespace TOPNSPC {
 
 static constexpr int kMaxReap = 256;
 
@@ -367,3 +367,5 @@ void KernelDevice::_aio_thread() {
         }
     }
 }
+
+}  // namespace TOPNSPC

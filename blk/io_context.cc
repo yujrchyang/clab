@@ -2,6 +2,8 @@
 
 #include "common/cassert.h"
 
+namespace TOPNSPC {
+
 void IOContext::aio_wait() {
     std::unique_lock l(lock);
     while (num_running.load() > 0)
@@ -18,3 +20,5 @@ void IOContext::release_running_aios() {
     clab_assert(num_running.load() == 0);
     running_aios.clear();
 }
+
+}  // namespace TOPNSPC

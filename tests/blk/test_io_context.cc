@@ -7,6 +7,8 @@
 
 #include "blk/io_context.h"
 
+using namespace TOPNSPC;
+
 TEST(IOContextTest, ConstructorSetsPriv) {
     int value = 42;
     IOContext ctx(&value);

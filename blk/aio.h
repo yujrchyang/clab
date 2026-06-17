@@ -12,6 +12,9 @@
 #include <boost/intrusive/list.hpp>
 
 #include "common/buffer.h"
+#include "common/common_fwd.h"
+
+namespace TOPNSPC {
 
 // ---------------------------------------------------------------------------
 // aio_t — single asynchronous I/O operation
@@ -25,7 +28,7 @@ struct aio_t {
     uint64_t offset = 0;
     uint64_t length = 0;
     long rval = -1000;
-    TOPNSPC::bufferlist bl;  // holds data stable for write duration
+    bufferlist bl;  // holds data stable for write duration
 
     boost::intrusive::list_member_hook<> queue_item;
 
@@ -74,5 +77,7 @@ struct aio_queue_t final : public io_queue_t {
     int get_next_completed(int timeout_ms,
                            aio_t **paio, int max) final;
 };
+
+}  // namespace TOPNSPC
 
 #endif  // BLK_AIO_H

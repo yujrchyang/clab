@@ -11,7 +11,7 @@
 #include <string>
 #include "common/buffer.h"
 
-namespace kv {
+namespace TOPNSPC {
 
 // ===================================================================
 // PrefixIteratorImpl
@@ -91,7 +91,7 @@ std::string PrefixIteratorImpl::key() const {
     return w_iter_->raw_key().second;
 }
 
-TOPNSPC::bufferlist PrefixIteratorImpl::value() const {
+bufferlist PrefixIteratorImpl::value() const {
     return w_iter_->value();
 }
 
@@ -105,9 +105,9 @@ int PrefixIteratorImpl::status() const {
 
 int KeyValueDB::get(const std::string &prefix,
                     const std::string &key,
-                    TOPNSPC::bufferlist *out) {
+                    bufferlist *out) {
     std::set<std::string> keys = {key};
-    std::map<std::string, TOPNSPC::bufferlist> result;
+    std::map<std::string, bufferlist> result;
     int r = get(prefix, keys, &result);
     if (r != 0) return r;
     auto it = result.find(key);
@@ -149,4 +149,4 @@ std::unique_ptr<KeyValueDB> KeyValueDB::create(
     return nullptr;
 }
 
-}  // namespace kv
+}  // namespace TOPNSPC

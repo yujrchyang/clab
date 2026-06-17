@@ -4,6 +4,8 @@
 
 #include "blk/kernel_device.h"
 
+namespace TOPNSPC {
+
 // ---------------------------------------------------------------------------
 // Utilities
 // ---------------------------------------------------------------------------
@@ -26,3 +28,5 @@ std::unique_ptr<BlockDevice> BlockDevice::create(
     const std::string &path, aio_callback_t cb, void *cbpriv) {
     return std::make_unique<KernelDevice>(path, cb, cbpriv);
 }
+
+}  // namespace TOPNSPC

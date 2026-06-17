@@ -10,6 +10,9 @@
 
 #include "blk/aio.h"
 #include "blk/block_device.h"
+#include "common/common_fwd.h"
+
+namespace TOPNSPC {
 
 class KernelDevice : public BlockDevice {
 public:
@@ -21,17 +24,17 @@ public:
     int open(const std::string &path) override;
     void close() override;
 
-    int read(uint64_t off, uint64_t len, TOPNSPC::bufferlist *pbl,
+    int read(uint64_t off, uint64_t len, bufferlist *pbl,
              IOContext *ioc, bool buffered) override;
     int read_random(uint64_t off, uint64_t len, char *buf,
                     bool buffered) override;
-    int write(uint64_t off, TOPNSPC::bufferlist &bl, bool buffered,
+    int write(uint64_t off, bufferlist &bl, bool buffered,
               int write_hint) override;
     int flush() override;
 
-    int aio_read(uint64_t off, uint64_t len, TOPNSPC::bufferlist *pbl,
+    int aio_read(uint64_t off, uint64_t len, bufferlist *pbl,
                  IOContext *ioc) override;
-    int aio_write(uint64_t off, TOPNSPC::bufferlist &bl, IOContext *ioc,
+    int aio_write(uint64_t off, bufferlist &bl, IOContext *ioc,
                   bool buffered, int write_hint) override;
     void aio_submit(IOContext *ioc) override;
     int discard(uint64_t off, uint64_t len) override;
@@ -58,5 +61,7 @@ private:
     std::mutex flush_mutex_;
     std::thread aio_thread_;
 };
+
+}  // namespace TOPNSPC
 
 #endif  // BLK_KERNEL_DEVICE_H
