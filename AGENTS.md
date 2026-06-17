@@ -132,8 +132,8 @@ decode(e, bl.cbegin());   // denc(o, p) 顶层包装
 - `tests/kv/test_rocksdb.cc`: 21 RocksDBStore tests
 - `tests/kv/test_memdb.cc`: 36 MemDB tests
 - `tests/kv/CMakeLists.txt`: test targets linking kv + RocksDB + clab_test_helpers + GTest
-- `docs/kv-design.md`: full design specification
-- `docs/freelist-manager-design.md`: FreelistManager/BitmapFreelistManager design analysis (Ceph reference: `src/os/bluestore/FreelistManager.*`, `BitmapFreelistManager.*`)
+- `docs/design/key-value-db.md`: full design specification
+- `docs/design/freelist-manager.md`: FreelistManager/BitmapFreelistManager design analysis (Ceph reference: `src/os/bluestore/FreelistManager.*`, `BitmapFreelistManager.*`)
 
 ### Next Steps (updated)
 - Implement FreelistManager / BitmapFreelistManager in `bluestore/` layer
