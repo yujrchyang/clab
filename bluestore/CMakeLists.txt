@@ -1,6 +1,7 @@
 add_library(bluestore STATIC
     allocator.cc
     avl_allocator.cc
+    bitmap_allocator.cc
     bitmap_freelist_manager.cc
 )
 target_include_directories(bluestore PUBLIC

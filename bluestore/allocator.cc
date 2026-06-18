@@ -3,6 +3,7 @@
 
 #include "bluestore/allocator.h"
 #include "bluestore/avl_allocator.h"
+#include "bluestore/bitmap_allocator.h"
 #include "common/intarith.h"
 
 namespace TOPNSPC {
@@ -28,6 +29,9 @@ Allocator *Allocator::create(const std::string &type, int64_t size,
                              int64_t block_size, std::string_view name) {
     if (type == "avl") {
         return new AvlAllocator(size, block_size, name);
+    }
+    if (type == "bitmap") {
+        return new BitmapAllocator(size, block_size, name);
     }
     return nullptr;
 }
