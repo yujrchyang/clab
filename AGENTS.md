@@ -27,7 +27,7 @@ never migrate across blank lines.
 ## Progress
 
 ### Goal
-Implement the kv abstraction layer for clab (RocksDBStore backend, MemDB debug backend), modeled after Ceph's `src/kv/*`.
+Implement the kv abstraction layer (RocksDBStore + MemDB) and bluestore layer (FreelistManager + Allocator) for clab, modeled after Ceph's `src/kv/*` and `src/os/bluestore/*`.
 
 ### Key Context
 - `TOPNSPC` macro defined in `common/common_fwd.h` → expands to `clab`
@@ -108,6 +108,13 @@ decode(e, bl.cbegin());   // denc(o, p) 顶层包装
   - `get_merge_ops()` protected accessor for subclasses
 - **Tests:** Split `test_librocksdb.cc` (23 raw RocksDB tests) from `test_rocksdb.cc` (21 RocksDBStore tests); 36 MemDB tests in `test_memdb.cc`; all 80 pass
 - **Ceph evaluation:** Compared `src/kv/*` (KeyValueDB, RocksDBStore, MemDB) and `src/os/bluestore/*` (KV usage patterns), identified 12 improvement items in 8 categories — all resolved
+- **Allocator implementation:**
+  - `Allocator` abstract base with `create()` factory, `init_add_free()`, `allocate()`, `release()`, `get_fragmentation()`, `get_alloc_stats()` interface
+  - `AvlAllocator`: interval-tree (AVL) based via `range_seg_tree_t`, exact match allocation, `_spillover_range()` cap mechanism
+  - `BitmapAllocator`: 2-level bitmap (`bdev_block_count` × `bitmap_granularity`), `ffs`/`ffz` scan, affinity hint via arena-weighted round-robin
+  - `HybridAllocator`: wraps AvlAllocator + BitmapAllocator child, `_add_to_tree()` override to claim-free adjacent extents from bitmap before AVL insert
+   - `Allocator::create()` factory with `"stupid"` (AvlAllocator), `"bitmap"`, `"hybrid"` type strings
+- **Tests:** 21 AvlAllocator tests, 33 BitmapAllocator tests, 19 HybridAllocator tests — all pass
 
 ### Key Decisions
 - Single default ColumnFamily (no hash sharding, no `parse_sharding_def`)
@@ -120,9 +127,11 @@ decode(e, bl.cbegin());   // denc(o, p) 顶层包装
 - Bitmap key encoding: 8 bytes big-endian uint64_t (memcmp-compatible, matches Ceph `_key_encode_u64`)
 - BitmapFreelistManager links as STATIC library `libbluestore.a`
 - bluestore/ subdirectory added to root CMakeLists.txt
+- Allocator::create() type string `"stupid"` maps to AvlAllocator (not the original Ceph StupidAllocator)
+- HybridAllocator allocation strategy: always try AVL first, bitmap as fallback (simplified from Ceph's conditional strategy)
+- `_add_to_tree()` claim-free optimization reclaims adjacent free extents from bitmap child before AVL insertion
 
 ### Next Steps
-- Allocator implementation (StupidAllocator / BitmapAllocator)
 - BlueStore core engine with KV + FreelistManager + Allocator integration
 
 ### Relevant Files
@@ -135,15 +144,22 @@ decode(e, bl.cbegin());   // denc(o, p) 顶层包装
 - `bluestore/freelist_manager.h`: FreelistManager abstract base
 - `bluestore/bitmap_freelist_manager.h` / `bluestore/bitmap_freelist_manager.cc`: BitmapFreelistManager implementation
 - `bluestore/CMakeLists.txt`: builds libbluestore.a (STATIC)
+- `bluestore/allocator.h` / `bluestore/allocator.cc`: Allocator abstract base + factory
+- `bluestore/avl_allocator.h` / `bluestore/avl_allocator.cc`: AvlAllocator (interval-tree)
+- `bluestore/bitmap_allocator.h` / `bluestore/bitmap_allocator.cc`: BitmapAllocator (2-level bitmap)
+- `bluestore/hybrid_allocator.h` / `bluestore/hybrid_allocator.cc`: HybridAllocator (AVL + bitmap)
 - `tests/kv/test_librocksdb.cc`: 23 raw RocksDB tests
 - `tests/kv/test_rocksdb.cc`: 21 RocksDBStore tests
 - `tests/kv/test_memdb.cc`: 36 MemDB tests
 - `tests/bluestore/test_bitmap_freelist_manager.cc`: 15 BitmapFreelistManager tests
+- `tests/bluestore/test_avl_allocator.cc`: 21 AvlAllocator tests
+- `tests/bluestore/test_bitmap_allocator.cc`: 33 BitmapAllocator tests
+- `tests/bluestore/test_hybrid_allocator.cc`: 19 HybridAllocator tests
 - `tests/kv/CMakeLists.txt`: test targets linking kv + RocksDB + clab_test_helpers + GTest
 - `docs/design/keyvalue-db.md`: full design specification
 - `docs/design/freelist-manager.md`: FreelistManager/BitmapFreelistManager design analysis (Ceph reference: `src/os/bluestore/FreelistManager.*`, `BitmapFreelistManager.*`)
 
 ### Next Steps (updated)
 - ~~Implement FreelistManager / BitmapFreelistManager in `bluestore/` layer~~ ✓
-- Implement Allocator (StupidAllocator / BitmapAllocator)
+- ~~Implement Allocator (AvlAllocator / BitmapAllocator / HybridAllocator)~~ ✓
 - BlueStore core engine with KV + FreelistManager + Allocator integration
