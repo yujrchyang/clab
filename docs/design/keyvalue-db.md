@@ -77,18 +77,18 @@ clab 需要在 block device 层之上实现一个类 BlueStore 的对象存储�
 ```plaintext
 kv/
 ├── CMakeLists.txt            ← 构建 libkv.so
-├── KeyValueDB.h              ← 抽象基类 (接口 + 内部 PrefixIteratorImpl)
-├── KeyValueDB.cc             ← create() 工厂方法
+├── key_value_db.h            ← 抽象基类 (接口 + 内部 PrefixIteratorImpl)
+├── key_value_db.cc           ← create() 工厂方法
 ├── mem/
-│   ├── MemDB.h
-│   └── MemDB.cc
+│   ├── mem_db.h
+│   └── mem_db.cc
 ├── rocksdb/
-│   ├── RocksDBStore.h
-│   └── RocksDBStore.cc
+│   ├── rocksdb_store.h
+│   └── rocksdb_store.cc
 └── merge_op/
-    ├── Int64ArrayMergeOperator.h  ← 用于 PREFIX_STAT
-    ├── XorMergeOperator.h         ← 用于 PREFIX_ALLOC_BITMAP
-    └── MergeOperator.h            ← 抽象基类 (移入 kv 层)
+    ├── int64_array_merge_op.h  ← 用于 PREFIX_STAT
+    ├── xor_merge_op.h          ← 用于 PREFIX_ALLOC_BITMAP
+    └── merge_op.h              ← 抽象基类
 ```
 
 ### 2.3 依赖关系
@@ -302,7 +302,7 @@ private:
 - **锁**: `std::mutex` 保护所有读写操作
 - **事务**: `MDBTransactionImpl` 将操作记录到 `vector<Op>`，提交时加锁依次回放
 - **迭代器**: 创建时获取 `std::map` 的 snapshot（排序后的 `vector<pair>`），并通过 `uint64_t seqno_` 检测写操作是否发生过。检测到变更后重新 snapshot 并重定位到之前的 key 位置。支持 `set_iterate_lower_bound` / `set_iterate_upper_bound`（自 `WholeSpaceIteratorImpl` 基类继承）。
-- **Merge**: 实现完整的 merge 语义，查找已注册的 MergeOperator 并调用 `merge_nonexistent` / `merge`。未注册的 prefix 触发 `clab_assert` 失败。
+- **Merge**: 实现完整的 merge 语义，查找已注册的 MergeOperator 并调用 `merge_nonexistent` / `merge`。未注册的 prefix 返回 `-ENOENT`。
 - **持久化**: 无。重启后数据丢失
 - **remove**: Ceph MemDB 的 `_save()`/`_load()` 文件持久化、`PerfCounters`、`btree_map` 支持均移除
 
@@ -320,7 +320,7 @@ private:
 - **open_read_only**: 通过 `rocksdb::DB::OpenForReadOnly()` 实现
 - **repair**: 通过 `rocksdb::RepairDB()` 实现
 - **compact_prefix / compact_range**: 编码 key 后调用 `CompactRange()` 限定 `[start, end)` Slice
-- **DeleteRange 阈值**: 通过构造函数 options `delete_range_threshold` 配置。当 range 大小 ≤ 阈值时，可用逐条删除替代 `DeleteRange` 以减少宽墓碑开销
+- **DeleteRange 阈值**: 通过构造函数 options `delete_range_threshold` 配置，预留用于小范围逐条删除以减少宽墓碑开销，当前初始版本始终使用 `DeleteRange`
 - **Init 选项解析**: `init(options_str)` 解析 `key=val;key=val` 格式字符串，支持设置 `write_buffer_size`、`max_write_buffer_number`、`max_bytes_for_level_base`、`target_file_size_base` 等 RocksDB 参数
 - **ITERATOR_NOCACHE**: 通过 `rocksdb::ReadOptions::fill_cache = false` 实现
 - **Compact**: 调用 `rocksdb::DB::CompactRange()`，同步版本
@@ -361,7 +361,25 @@ class Int64ArrayMergeOperator : public MergeOperator {
 };
 ```
 
-类似地，`XorMergeOperator` 做位级别的异或操作用于 BitmapFreelistManager。
+`XorMergeOperator` 做位级别的异或操作用于 BitmapFreelistManager：
+
+```cpp
+class XorMergeOperator : public MergeOperator {
+  const char *name() const override { return "xor"; }
+  void merge_nonexistent(const char *rdata, size_t rlen,
+                          std::string *new_value) override {
+    *new_value = std::string(rdata, rlen);
+  }
+  void merge(const char *ldata, size_t llen,
+             const char *rdata, size_t rlen,
+             std::string *new_value) override {
+    size_t len = std::min(llen, rlen);
+    new_value->resize(len);
+    for (size_t i = 0; i < len; i++)
+      (*new_value)[i] = ldata[i] ^ rdata[i];
+  }
+};
+```
 
 ## 5. IO 流程
 

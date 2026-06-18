@@ -68,6 +68,15 @@ On open it probes device geometry via `ioctl` (BLKSSZGET, BLKIOOPT,
 BLKROTATIONAL, BLKDISCARD) and sets up a `aio_queue_t` with an adaptive
 iodepth (`max(16, min(128, size/blocksize/4))`).
 
+**Internal fallback flags:**
+
+- `dio_` (default `true`): when set to `false`, falls back to buffered I/O
+- `aio_` (default `true`): when set to `false`, falls back to synchronous
+  `pread`/`pwritev` instead of libaio
+- `write_hint`: `WRITE_LIFE_*` enum is defined and accepted by `write()` /
+  `aio_write()` but currently **not forwarded** to the kernel via
+  `fcntl(F_SET_RW_HINT)`; this is a known gap
+
 **AIO Completion Thread** (`_aio_thread`):
 
 - Background thread polling `io_queue_->get_next_completed(...)` every 50 ms.

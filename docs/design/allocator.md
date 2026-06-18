@@ -13,15 +13,15 @@
 
 两者的关系：
 
-```
+```plaintext
 IO 写入路径:
   alloc->allocate(want, unit, max_alloc_size, hint, &extents)  // 内存中标记已分配
   → bdev->write(extents, data)                                 // 写入设备
-  → _txc_finalize_kv: fm->allocate(off, len, txn)             // 持久化到 KV
+  → _txc_finalize_kv: fm->allocate(off, len, txn)              // 持久化到 KV
 
 回收路径:
   _txc_release_alloc: alloc->release(txc->released)            // 内存中归还（延迟到所有前置 IO 完成后）
-  → _txc_finalize_kv: fm->release(off, len, txn)              // 持久化到 KV
+  → _txc_finalize_kv: fm->release(off, len, txn)               // 持久化到 KV
 
 恢复路径:
   fm->enumerate_next() → alloc->init_add_free(offset, length)  // 从 FM 重建
@@ -61,7 +61,7 @@ IO 写入路径:
 
 ### 2.1 Allocator 抽象基类
 
-```
+```plaintext
 ┌───────────────────────────────────────────────┐
 │               Allocator (abstract)            │
 │  allocate / release / init_add_free /         │
@@ -88,7 +88,7 @@ IO 写入路径:
 
 两棵 `boost::intrusive::avl_set`：
 
-```
+```plaintext
 range_tree (offset 排序):
   [0 ~ 1M] → [2M ~ 5M] → [8M ~ 10M] → ...
 
@@ -106,12 +106,13 @@ struct range_seg_t {
 ```
 
 辅助结构：
+
 - **`lbas[64]`**: 按 size 的 highest power-of-2 分桶的 cursor 数组，每个桶记录上次分配位置
 - **`num_free`**: 内存中的总空闲字节数
 
 #### 2.2.2 分配策略：First-fit + Best-fit 混合
 
-```
+```plaintext
 _allocate(size, unit, &offset, &length):
   1. 获取 max_size = range_size_tree 中的最大区间长度
   2. 若 max_size < size → 降级到 max_size（若 max_size < unit 则返回 ENOSPC）
@@ -131,7 +132,7 @@ _allocate(size, unit, &offset, &length):
 
 #### 2.2.3 释放策略
 
-```
+```plaintext
 _add_to_tree(start, size):
   1. 在 range_tree 中用 upper_bound 找到插入位置 rs_after
   2. 获取前驱节点 rs_before
@@ -159,14 +160,14 @@ _add_to_tree(start, size):
 
 #### 2.3.1 三级位图结构
 
-```
+```plaintext
     | AU | AU |                    ......                    |   磁盘
     | 0  | 1  |                    ......                    |   L0
     .                         .
        .     64 bytes (512 bits) .
           .    (1 slotset)    .
               .         .
-              | 00 | 01 | 11 |                              |   L1
+              | 00 | 01 | 11 |                               |   L1
                .           .
             | 0 | 0 | 1 |                                    |   L2
 ```
@@ -175,17 +176,18 @@ _add_to_tree(start, size):
 
 | 层级 | 粒度 | 每 slot 条目 | 条目含义 |
 | --- | --- | --- | --- |
-| L0 | alloc unit (e.g. 4KB) | 64 (uint64_t 每个 bit 表示一个 AU) | 1=空闲, 0=已分配 |
-| L1 | 64 * AU (512个AU ≈ 2MB @ 4KB) | 32 (每 2 bit 描述一个 L0 slotset) | 00=全分配, 01=部分分配, 11=全空闲 |
-| L2 | 32 * L1粒度 (≈ 64MB @ 4KB) | 64 (每 1 bit 描述一个 L1 slotset) | 0=全分配, 1=有可用空间 |
+| L0 | alloc unit (e.g. 4KB) | 64 (uint64_t 每个 bit 表示一个 AU) | 1=空闲，0=已分配 |
+| L1 | 64 * AU (512 个 AU ≈ 2MB @ 4KB) | 32 (每 2 bit 描述一个 L0 slotset) | 00=全分配，01=部分分配，11=全空闲 |
+| L2 | 32 * L1 粒度 (≈ 64MB @ 4KB) | 64 (每 1 bit 描述一个 L1 slotset) | 0=全分配，1=有可用空间 |
 
 **对齐优化**:
+
 - `slots_per_slotset = 8` 个 `uint64_t` = 64 字节 = x86\_64 cache line 大小
 - 每一层的分配/标记以 slotset 为单位操作，最大化 cache 利用率
 
 #### 2.3.2 分配算法
 
-```
+```plaintext
 _allocate_l2(want, min_length, max_length, hint, allocated, extents):
   1. 若 hint != 0 → last_pos = align(hint / l2_granularity, L1_ENTRIES_PER_SLOT)
   2. 两轮扫描:
@@ -205,7 +207,7 @@ _allocate_l2(want, min_length, max_length, hint, allocated, extents):
 
 #### 2.3.3 释放算法
 
-```
+```plaintext
 _free_l2(release_set):
   for each (offset, length) in release_set:
     1. l1._free_l1(offset, length) → 标记 L0/L1 位图
@@ -217,7 +219,7 @@ _free_l2(release_set):
 
 HybridAllocator 继承 AvlAllocator，内嵌一个 BitmapAllocator 作为 fallback：
 
-```
+```plaintext
                  AvlAllocator (primary)
                 /              \
          AVL tree          BitmapAllocator (fallback)
@@ -226,17 +228,16 @@ HybridAllocator 继承 AvlAllocator，内嵌一个 BitmapAllocator 作为 fallba
 
 #### 2.4.1 分配策略
 
-```
+```plaintext
 allocate(want, unit, max_alloc_size, hint, extents):
-  if bmap_alloc 有空间 AND want < AVL 中最小节点长度:
-    1. 尝试从 bitmap 分配
-    2. 若不够 → AVL 补足
-    3. 若 bitmap 完全失败 → 释放已分配，回退到 AVL
-  else:
-    1. 尝试从 AVL 分配
-    2. 若不够 → bitmap 补足
-    3. 若 AVL 完全失败 → 释放已分配，回退到 bitmap
+  1. 尝试从 AVL 分配
+  2. 若不够 → bitmap 补足
+  3. 若 AVL 完全失败 → 释放已分配，回退到 bitmap
 ```
+
+当前实现简化了 Ceph 原版的策略——始终优先尝试 AVL 树，AVL 不能满足时回退到 bitmap，
+不再检查 bitmap 是否有空间或 want 与 AVL 最小节点的关系。
+`_add_to_tree()` 认领回收 (详见 §2.4.3) 是主要的 bitmap → AVL 回流通道。
 
 #### 2.4.2 Spillover 机制
 
@@ -251,17 +252,19 @@ _spillover_range(start, end):
 
 #### 2.4.3 合并时的回收机制
 
+`HybridAllocator` 重写（override）了 `_add_to_tree()`，在插入 AVL 树之前尝试从 bitmap
+child 中"认领"相邻的空闲区间，以增加合并成大块连续区间的概率：
+
 ```cpp
-// HybridAllocator::_add_to_tree(start, size):
-// 在插入 AVL 树之前，尝试从 bitmap 中 "认领" 相邻的空闲区间
-// 以增加合并成大块连续区间的概率
-if (bmap_alloc) {
-    head = bmap_alloc->claim_free_to_left(start)    // start 左侧连续空闲
-    tail = bmap_alloc->claim_free_to_right(start+size) // end 右侧连续空闲
-    start -= head;
-    size += head + tail;
+void HybridAllocator::_add_to_tree(uint64_t start, uint64_t size) {
+    if (child_) {
+        uint64_t head = child_->claim_free_to_left(start);
+        uint64_t tail = child_->claim_free_to_right(start + size);
+        start -= head;
+        size += head + tail;
+    }
+    AvlAllocator::_add_to_tree(start, size);
 }
-AvlAllocator::_add_to_tree(start, size);
 ```
 
 ### 2.5 hint 参数的使用
@@ -330,11 +333,11 @@ public:
 
     const std::string& get_name() const;
     int64_t get_capacity() const { return device_size; }
-    int64_t get_block_size() const { return block_size; }
+    int64_t get_block_size() const { return block_size_; }
 
 protected:
     const int64_t device_size;
-    const int64_t block_size;
+    const int64_t block_size_;
 };
 ```
 
@@ -359,7 +362,7 @@ using PExtentVector = std::vector<bluestore_pextent_t>;
 
 ### 4.1 启动恢复流程
 
-```
+```plaintext
 BlueStore::_open_db_and_fm()
   │
   ├── db->open()                          // 打开 KV store
@@ -379,7 +382,7 @@ BlueStore::_open_db_and_fm()
 
 ### 4.2 写入 IO 路径
 
-```
+```plaintext
 BlueStore::_do_alloc_write()
   │
   ├── alloc->allocate(need, min_alloc_size, need, 0, &prealloc)
@@ -402,7 +405,7 @@ BlueStore::_do_alloc_write()
 
 当 FM 启用 null_manager 时，allocate/release 不写 KV store。但 Allocator 仍正常在内存中标记分配/释放。关闭时将 allocator 的完整状态写入 BlueFS 文件：
 
-```
+```plaintext
 close():
   store_allocator(alloc) → BlueFS file "allocator_ncb"
 ```
@@ -444,6 +447,7 @@ close():
 ### 5.4 依赖关系
 
 Allocator 依赖：
+
 - `common` 库: `bufferlist`、`clab_assert`、`interval_set`、`intarith` 工具函数
 - 无 `kv` / `rocksdb` 依赖（只操作内存）
 - 无 `blk` 依赖
@@ -462,21 +466,21 @@ Allocator 依赖：
 
 ### 5.6 与 FreelistManager 的关系
 
-```
-mkfs 时:
+```plaintext
+mkfs 时：
   alloc → 全空闲状态
   fm->create() → 初始化 KV 位图
 
-挂载时:
+挂载时：
   fm->enumerate_next() → alloc->init_add_free()  // 重建
 
-运行时:
-  IO 前:  alloc->allocate()    // 内存决策
-  IO 后:  fm->allocate()       // 持久化
+运行时：
+  IO 前：alloc->allocate()    // 内存决策
+  IO 后：fm->allocate()       // 持久化
 
-回收时:
-  IO 完成: alloc->release()    // 内存归还（延迟）
-           fm->release()       // 持久化
+回收时：
+  IO 完成：alloc->release()   // 内存归还（延迟）
+           fm->release()     // 持久化
 ```
 
 ## 6. 参考

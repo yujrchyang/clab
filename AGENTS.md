@@ -140,7 +140,7 @@ decode(e, bl.cbegin());   // denc(o, p) 顶层包装
 - `tests/kv/test_memdb.cc`: 36 MemDB tests
 - `tests/bluestore/test_bitmap_freelist_manager.cc`: 15 BitmapFreelistManager tests
 - `tests/kv/CMakeLists.txt`: test targets linking kv + RocksDB + clab_test_helpers + GTest
-- `docs/design/key-value-db.md`: full design specification
+- `docs/design/keyvalue-db.md`: full design specification
 - `docs/design/freelist-manager.md`: FreelistManager/BitmapFreelistManager design analysis (Ceph reference: `src/os/bluestore/FreelistManager.*`, `BitmapFreelistManager.*`)
 
 ### Next Steps (updated)

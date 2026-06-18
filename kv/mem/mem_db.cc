@@ -149,9 +149,7 @@ public:
     }
 
     std::string key() const override {
-        return decode_key(
-                   items_[static_cast<size_t>(pos_)].first)
-            .second;
+        return items_[static_cast<size_t>(pos_)].first;
     }
 
     bufferlist value() const override {

@@ -14,6 +14,16 @@ HybridAllocator::HybridAllocator(int64_t device_size, int64_t block_size,
         device_size, block_size, std::string(name) + ".child");
 }
 
+void HybridAllocator::_add_to_tree(uint64_t start, uint64_t size) {
+    if (child_) {
+        uint64_t head = child_->claim_free_to_left(start);
+        uint64_t tail = child_->claim_free_to_right(start + size);
+        start -= head;
+        size += head + tail;
+    }
+    AvlAllocator::_add_to_tree(start, size);
+}
+
 void HybridAllocator::_spillover_range(uint64_t start, uint64_t end) {
     child_->init_add_free(start, end - start);
 }

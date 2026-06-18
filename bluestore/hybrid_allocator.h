@@ -37,6 +37,7 @@ public:
     void shutdown() override;
 
 protected:
+    void _add_to_tree(uint64_t start, uint64_t size) override;
     void _spillover_range(uint64_t start, uint64_t end) override;
 
 private:

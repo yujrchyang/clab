@@ -74,7 +74,7 @@ BitmapFreelistManager 使用两个 KV prefix：
 
 **示例**: 一个 4KB block size、128 blocks/key、1TB 设备
 
-```
+```plaintext
 bytes_per_block   = 4096 (4KB)
 blocks_per_key    = 128
 bytes_per_key     = 4096 * 128 = 524288 (512KB)
@@ -139,9 +139,16 @@ uint64_t size_2_block_count(uint64_t target_size) const {
 
 ```cpp
 class FreelistManager {
-    bool null_manager = false;
+    bool null_manager_ = false;
+
 public:
     virtual ~FreelistManager() {}
+
+    /// 工厂方法（当前支持 "bitmap" 类型）
+    static FreelistManager *create(
+        const std::string &type,
+        const std::string &meta_prefix,
+        const std::string &bitmap_prefix);
 
     /// mkfs: 在事务中持久化配置参数
     virtual int create(uint64_t size, uint64_t granularity,
@@ -166,16 +173,16 @@ public:
 
     /// 查询
     virtual uint64_t get_size() const = 0;
-    virtual uint64_t get_alloc_units() const = 0;   // 总 block 数
-    virtual uint64_t get_alloc_size() const = 0;    // block size
+    virtual uint64_t get_alloc_units() const = 0;
+    virtual uint64_t get_alloc_size() const = 0;
 
     /// 导出元数据（供写 bdev label / 持久化配置）
     virtual void get_meta(uint64_t target_size,
         std::vector<std::pair<std::string, std::string>>*) const = 0;
 
     /// null_manager 模式控制
-    bool is_null_manager() const { return null_manager; }
-    void set_null_manager() { null_manager = true; }
+    bool is_null_manager() const { return null_manager_; }
+    void set_null_manager() { null_manager_ = true; }
 };
 ```
 
@@ -252,13 +259,13 @@ BlueStore::mkfs()
 ```plaintext
 BlueStore::_open_db()
   ├── db->open(out)                // 打开 KV store
-  └── FreelistManager::setup_merge_operators(db, "bitmap")
+  └── db->set_merge_operator("b", XorMergeOperator)  // 注册 XOR merge op
 
 BlueStore::_open_fm()
   ├── fm->init(kvdb, read_only, cfg_reader)
   │     ├── _read_cfg(cfg_reader)     // 从 bdev label 读取参数 (可选)
   │     ├── if fail: _load_from_db()  // 从 meta_prefix 读取
-  │     ├── _sync()                   // 检查 size 变化，必要时 expand
+  │     ├── _sync()                   // 检查 size 变化，必要时 expand (初始版本 deferred)
   │     └── _init_misc()              // 计算 key_mask, all_set_bl 等
   │
   ├── 分支: 重建 Allocator
@@ -352,6 +359,7 @@ BitmapFreelistManager 的线程安全模型：
 ### 6.2 null_manager 模式
 
 当设备满足以下条件时可启用 null_manager 优化：
+
 - 非 SMR 设备
 - 存在 BlueFS（分配状态可写文件）
 - 非 read_only 模式
@@ -359,15 +367,17 @@ BitmapFreelistManager 的线程安全模型：
 启用后 FM 行为变更：
 
 ```cpp
-void BitmapFreelistManager::allocate(offset, length, txn) {
+void BitmapFreelistManager::allocate(uint64_t offset, uint64_t length,
+                                     KeyValueDB::Transaction txn) {
     if (!is_null_manager())
-        _xor(offset, length, txn);   // 正常模式: 写 KV
-    // null 模式: 空操作，仅更新 Allocator (内存)
+        _xor(offset, length, txn);   // 正常模式：写 KV
+    // null 模式：空操作，仅更新 Allocator (内存)
 }
-void BitmapFreelistManager::release(offset, length, txn) {
+void BitmapFreelistManager::release(uint64_t offset, uint64_t length,
+                                     KeyValueDB::Transaction txn) {
     if (!is_null_manager())
-        _xor(offset, length, txn);   // 正常模式: 写 KV
-    // null 模式: 空操作，仅更新 Allocator (内存)
+        _xor(offset, length, txn);   // 正常模式：写 KV
+    // null 模式：空操作，仅更新 Allocator (内存)
 }
 ```
 
@@ -408,8 +418,8 @@ copy_allocator_content_to_fm(alloc, fm);
 // mkfs 时注册 merge operator
 db->set_merge_operator("b", std::make_shared<kv::XorMergeOperator>());
 
-// 通过工厂方法构造 (内部 new BitmapFreelistManager)
-auto fm = FreelistManager::create(cct, "bitmap", "B");
+// 通过工厂方法构造
+auto fm = FreelistManager::create("bitmap", "B", "b");
 fm->create(size, bytes_per_block, txn);
 db->submit_transaction_sync(txn);
 
@@ -441,4 +451,4 @@ BitmapFreelistManager 作为 `bluestore` 库的内部组件编译，链接 `kv`�
 - Ceph source: `src/os/bluestore/BlueStore.cc` (`_open_fm`, `_txc_finalize_kv`, `_init_alloc`, `_close_fm`)
 - 本项目的 `kv/key_value_db.h`: KeyValueDB 抽象层
 - 本项目的 `kv/merge_op/xor_merge_op.h`: XorMergeOperator
-- `docs/kv-design.md`: KV 层设计文档
+- `docs/design/keyvalue-db.md`: KV 层设计文档

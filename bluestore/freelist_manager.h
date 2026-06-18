@@ -40,6 +40,10 @@ public:
     virtual void get_meta(uint64_t target_size,
                           std::vector<std::pair<std::string, std::string>> *) const = 0;
 
+    static FreelistManager *create(const std::string &type,
+                                   const std::string &meta_prefix,
+                                   const std::string &bitmap_prefix);
+
     bool is_null_manager() const { return null_manager_; }
     void set_null_manager() { null_manager_ = true; }
 };
