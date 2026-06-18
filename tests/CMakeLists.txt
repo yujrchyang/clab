@@ -13,3 +13,4 @@ target_include_directories(clab_test_helpers INTERFACE
 add_subdirectory(common)
 add_subdirectory(blk)
 add_subdirectory(kv)
+add_subdirectory(bluestore)

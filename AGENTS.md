@@ -116,10 +116,14 @@ decode(e, bl.cbegin());   // denc(o, p) 顶层包装
 - DeleteRange threshold: configurable via `delete_range_threshold`, default 0 → always use DeleteRange
 - MemDB iterator invalidation: seqno-based, automatically rebuilds snapshot on detection of concurrent writes
 - Iterator bounds two-layer separation: `WholeSpaceIteratorImpl` stores `const std::string*`, backend converts to native type (`rocksdb::Slice*`) at seek time
+- BitmapFreelistManager: `create()` allocates block 0 at mkfs time (caller must not double-allocate)
+- Bitmap key encoding: 8 bytes big-endian uint64_t (memcmp-compatible, matches Ceph `_key_encode_u64`)
+- BitmapFreelistManager links as STATIC library `libbluestore.a`
+- bluestore/ subdirectory added to root CMakeLists.txt
 
 ### Next Steps
-- BlueStore implementation using kv interface
-- Potential additions when needed: `set_cache_size()`, `get_property()`, `get_approximate_size()` (Ceph-compatible helpers, not blocking)
+- Allocator implementation (StupidAllocator / BitmapAllocator)
+- BlueStore core engine with KV + FreelistManager + Allocator integration
 
 ### Relevant Files
 - `kv/key_value_db.h`: Abstract base (TransactionImpl, IteratorImpl, WholeSpaceIteratorImpl, PrefixIteratorImpl, KeyValueDB)
@@ -128,14 +132,18 @@ decode(e, bl.cbegin());   // denc(o, p) 顶层包装
 - `kv/rocksdb/rocksdb_store.h` / `kv/rocksdb/rocksdb_store.cc`: RocksDBStore backend
 - `kv/merge_op/`: MergeOperator abstract base, Int64ArrayMergeOperator, XorMergeOperator
 - `kv/CMakeLists.txt`: builds libkv.so (SHARED), links common (PUBLIC) + RocksDB::RocksDB (PRIVATE), uses `-Wno-unused-parameter`
+- `bluestore/freelist_manager.h`: FreelistManager abstract base
+- `bluestore/bitmap_freelist_manager.h` / `bluestore/bitmap_freelist_manager.cc`: BitmapFreelistManager implementation
+- `bluestore/CMakeLists.txt`: builds libbluestore.a (STATIC)
 - `tests/kv/test_librocksdb.cc`: 23 raw RocksDB tests
 - `tests/kv/test_rocksdb.cc`: 21 RocksDBStore tests
 - `tests/kv/test_memdb.cc`: 36 MemDB tests
+- `tests/bluestore/test_bitmap_freelist_manager.cc`: 15 BitmapFreelistManager tests
 - `tests/kv/CMakeLists.txt`: test targets linking kv + RocksDB + clab_test_helpers + GTest
 - `docs/design/key-value-db.md`: full design specification
 - `docs/design/freelist-manager.md`: FreelistManager/BitmapFreelistManager design analysis (Ceph reference: `src/os/bluestore/FreelistManager.*`, `BitmapFreelistManager.*`)
 
 ### Next Steps (updated)
-- Implement FreelistManager / BitmapFreelistManager in `bluestore/` layer
+- ~~Implement FreelistManager / BitmapFreelistManager in `bluestore/` layer~~ ✓
 - Implement Allocator (StupidAllocator / BitmapAllocator)
 - BlueStore core engine with KV + FreelistManager + Allocator integration

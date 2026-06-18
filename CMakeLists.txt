@@ -47,6 +47,9 @@ add_subdirectory(blk)
 # --- KV storage library ---
 add_subdirectory(kv)
 
+# --- BlueStore library ---
+add_subdirectory(bluestore)
+
 # --- Examples ---
 if(EXAMPLE)
     add_subdirectory(examples)

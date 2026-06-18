@@ -27,6 +27,7 @@ const scopeDef = [
     'common',
     'blk',
     'kv',
+    'bluestore',
     'example',
     'test'
 ]
