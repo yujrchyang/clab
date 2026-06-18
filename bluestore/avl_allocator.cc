@@ -16,11 +16,11 @@ struct range_t {
 }  // namespace
 
 AvlAllocator::AvlAllocator(int64_t device_size, int64_t block_size,
-                            std::string_view name)
+                           std::string_view name)
     : AvlAllocator(device_size, block_size, 0, name) {}
 
 AvlAllocator::AvlAllocator(int64_t device_size, int64_t block_size,
-                            uint64_t max_mem, std::string_view name)
+                           uint64_t max_mem, std::string_view name)
     : Allocator(name, device_size, block_size),
       range_size_alloc_threshold_(128 * 1024),
       range_size_alloc_free_pct_(4),
@@ -33,8 +33,8 @@ AvlAllocator::~AvlAllocator() {
 }
 
 uint64_t AvlAllocator::_pick_block_after(uint64_t *cursor,
-                                          uint64_t size,
-                                          uint64_t align) {
+                                         uint64_t size,
+                                         uint64_t align) {
     const auto compare = range_tree_.key_comp();
     uint32_t search_count = 0;
     uint64_t search_bytes = 0;
@@ -64,7 +64,8 @@ uint64_t AvlAllocator::_pick_block_after(uint64_t *cursor,
         }
         if (max_search_count_ > 0 && ++search_count > max_search_count_)
             return -1ULL;
-        if (max_search_bytes_ > 0 && search_bytes + rs->start > max_search_bytes_)
+        if (max_search_bytes_ > 0 &&
+            search_bytes + (rs_start->start - rs->start) > max_search_bytes_)
             return -1ULL;
     }
     return -1ULL;
@@ -73,7 +74,10 @@ uint64_t AvlAllocator::_pick_block_after(uint64_t *cursor,
 uint64_t AvlAllocator::_pick_block_fits(uint64_t size, uint64_t align) {
     const auto compare = range_size_tree_.key_comp();
     auto rs_start = range_size_tree_.lower_bound(range_t{0, size}, compare);
+    uint32_t search_count = 0;
     for (auto rs = rs_start; rs != range_size_tree_.end(); ++rs) {
+        if (max_search_count_ > 0 && ++search_count > max_search_count_)
+            return -1ULL;
         uint64_t offset = p2roundup(rs->start, align);
         if (offset + size <= rs->end)
             return offset;
@@ -119,7 +123,8 @@ void AvlAllocator::_add_to_tree(uint64_t start, uint64_t size) {
 void AvlAllocator::_spillover_range(uint64_t start, uint64_t end) {
     (void)start;
     (void)end;
-    clab_assert(false && "spillover not implemented in base AvlAllocator");
+    // No-op in the base class: overflows are silently dropped.
+    // Subclasses (HybridAllocator) redirect to a fallback allocator.
 }
 
 void AvlAllocator::_process_range_removal(uint64_t start, uint64_t end,
@@ -148,17 +153,17 @@ void AvlAllocator::_process_range_removal(uint64_t start, uint64_t end,
     }
 }
 
-void AvlAllocator::_remove_from_tree(uint64_t start, uint64_t size) {
+bool AvlAllocator::_remove_from_tree(uint64_t start, uint64_t size) {
     uint64_t end = start + size;
     clab_assert(size != 0);
-    clab_assert(size <= num_free_);
 
     auto rs = range_tree_.find(range_t{start, end}, range_tree_.key_comp());
-    clab_assert(rs != range_tree_.end());
-    clab_assert(rs->start <= start);
-    clab_assert(rs->end >= end);
+    if (rs == range_tree_.end() || rs->start > start || rs->end < end)
+        return false;
+    clab_assert(size <= num_free_);
 
     _process_range_removal(start, end, rs);
+    return true;
 }
 
 void AvlAllocator::_range_size_tree_rm(range_seg_t &r) {
@@ -168,45 +173,73 @@ void AvlAllocator::_range_size_tree_rm(range_seg_t &r) {
 }
 
 void AvlAllocator::_range_size_tree_try_insert(range_seg_t &r) {
-    if (!range_count_cap_ || range_size_tree_.size() < range_count_cap_) {
-        range_size_tree_.insert(r);
-        num_free_ += r.length();
-        return;
-    }
-    if (r.length() > _lowest_size_available()) {
-        auto evict = range_size_tree_.begin();
-        _range_size_tree_rm(*evict);
-        _spillover_range(evict->start, evict->end);
-        range_tree_.erase_and_dispose(*evict, dispose_rs{});
+    if (_try_insert_range(r.start, r.end)) {
         range_size_tree_.insert(r);
         num_free_ += r.length();
     } else {
-        _spillover_range(r.start, r.end);
         range_tree_.erase_and_dispose(r, dispose_rs{});
     }
 }
 
 bool AvlAllocator::_try_insert_range(uint64_t start, uint64_t end,
                                      range_tree_t::iterator *insert_pos) {
-    auto new_rs = new range_seg_t{start, end};
-    range_tree_.insert_before(*insert_pos, *new_rs);
-    if (!range_count_cap_ || range_size_tree_.size() < range_count_cap_) {
-        range_size_tree_.insert(*new_rs);
-        num_free_ += new_rs->length();
-        return true;
+    bool res = !range_count_cap_ || range_size_tree_.size() < range_count_cap_;
+    bool remove_lowest = false;
+    if (!res) {
+        if (end - start > _lowest_size_available()) {
+            remove_lowest = true;
+            res = true;
+        }
     }
-    if (new_rs->length() > _lowest_size_available()) {
-        auto evict = range_size_tree_.begin();
-        _range_size_tree_rm(*evict);
-        _spillover_range(evict->start, evict->end);
-        range_tree_.erase_and_dispose(*evict, dispose_rs{});
-        range_size_tree_.insert(*new_rs);
-        num_free_ += new_rs->length();
-        return true;
+    if (!res) {
+        _spillover_range(start, end);
+    } else {
+        if (insert_pos) {
+            auto new_rs = new range_seg_t{start, end};
+            range_tree_.insert_before(*insert_pos, *new_rs);
+            range_size_tree_.insert(*new_rs);
+            num_free_ += new_rs->length();
+        }
+        if (remove_lowest) {
+            auto r = range_size_tree_.begin();
+            _range_size_tree_rm(*r);
+            _spillover_range(r->start, r->end);
+            range_tree_.erase_and_dispose(*r, dispose_rs{});
+        }
     }
-    _spillover_range(start, end);
-    range_tree_.erase_and_dispose(*new_rs, dispose_rs{});
-    return false;
+    return res;
+}
+
+void AvlAllocator::_try_remove_from_tree(
+    uint64_t start, uint64_t size,
+    std::function<void(uint64_t, uint64_t, bool)> cb) {
+    uint64_t end = start + size;
+    clab_assert(size != 0);
+
+    auto rs = range_tree_.find(range_t{start, end}, range_tree_.key_comp());
+    if (rs == range_tree_.end() || rs->start >= end) {
+        cb(start, size, false);
+        return;
+    }
+
+    do {
+        auto next_rs = rs;
+        ++next_rs;
+
+        if (start < rs->start) {
+            cb(start, rs->start - start, false);
+            start = rs->start;
+        }
+        auto range_end = std::min(rs->end, end);
+        _process_range_removal(start, range_end, rs);
+        cb(start, range_end - start, true);
+        start = range_end;
+
+        rs = next_rs;
+    } while (rs != range_tree_.end() && rs->start < end && start < end);
+    if (start < end) {
+        cb(start, end - start, false);
+    }
 }
 
 int AvlAllocator::_allocate_single(uint64_t size, uint64_t unit,
@@ -310,26 +343,39 @@ uint64_t AvlAllocator::get_free() {
     return num_free_;
 }
 
-double AvlAllocator::get_fragmentation() {
-    std::lock_guard l(lock_);
+double AvlAllocator::_get_fragmentation() const {
     auto free_blocks = p2align(num_free_, uint64_t(block_size_)) / block_size_;
     if (free_blocks <= 1)
         return 0.0;
     return static_cast<double>(range_tree_.size() - 1) / (free_blocks - 1);
 }
 
-void AvlAllocator::dump() {
+double AvlAllocator::get_fragmentation() {
     std::lock_guard l(lock_);
+    return _get_fragmentation();
+}
+
+void AvlAllocator::_dump() const {
     for (auto &rs : range_tree_) {
         (void)rs;
     }
 }
 
+void AvlAllocator::dump() {
+    std::lock_guard l(lock_);
+    _dump();
+}
+
+void AvlAllocator::_foreach(
+    std::function<void(uint64_t offset, uint64_t length)> notify) const {
+    for (auto &rs : range_tree_)
+        notify(rs.start, rs.end - rs.start);
+}
+
 void AvlAllocator::foreach (
     std::function<void(uint64_t offset, uint64_t length)> notify) {
     std::lock_guard l(lock_);
-    for (auto &rs : range_tree_)
-        notify(rs.start, rs.end - rs.start);
+    _foreach(notify);
 }
 
 void AvlAllocator::init_add_free(uint64_t offset, uint64_t length) {

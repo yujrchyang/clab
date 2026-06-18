@@ -304,4 +304,40 @@ TEST_F(BitmapAllocatorTest, CreateViaFactory) {
     delete a;
 }
 
+// =====================================================================
+// claim_free_to_left / claim_free_to_right
+// =====================================================================
+
+TEST_F(BitmapAllocatorTest, ClaimFreeToLeft) {
+    add_free(ALLOC_UNIT, ALLOC_UNIT * 4);
+    uint64_t claimed = alloc->claim_free_to_left(ALLOC_UNIT);
+    // No free space to the left of ALLOC_UNIT → 0
+    EXPECT_EQ(claimed, 0);
+    EXPECT_EQ(alloc->get_free(), ALLOC_UNIT * 4);
+}
+
+TEST_F(BitmapAllocatorTest, ClaimFreeToRight) {
+    add_free(0, ALLOC_UNIT * 4);
+    uint64_t claimed = alloc->claim_free_to_right(ALLOC_UNIT * 2);
+    // From ALLOC_UNIT*2 rightward, all free until ALLOC_UNIT*4 → 2 blocks
+    EXPECT_EQ(claimed, ALLOC_UNIT * 2);
+    EXPECT_EQ(alloc->get_free(), ALLOC_UNIT * 2);  // only [0, 8K) remains
+}
+
+TEST_F(BitmapAllocatorTest, ClaimFreeToLeftFullRange) {
+    add_free(ALLOC_UNIT, ALLOC_UNIT * 4);
+    uint64_t claimed = alloc->claim_free_to_left(ALLOC_UNIT * 5);
+    // [ALLOC_UNIT, ALLOC_UNIT*5) is all free → claim 4 blocks
+    EXPECT_EQ(claimed, ALLOC_UNIT * 4);
+    EXPECT_EQ(alloc->get_free(), 0);
+}
+
+TEST_F(BitmapAllocatorTest, ClaimFreeToRightPartialRange) {
+    add_free(0, ALLOC_UNIT * 8);
+    uint64_t claimed = alloc->claim_free_to_right(ALLOC_UNIT * 2);
+    // [ALLOC_UNIT*2, ALLOC_UNIT*8) is free → claim 6 blocks
+    EXPECT_EQ(claimed, ALLOC_UNIT * 6);
+    EXPECT_EQ(alloc->get_free(), ALLOC_UNIT * 2);  // [0, 8K) remains
+}
+
 }  // namespace

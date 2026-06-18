@@ -165,8 +165,8 @@ TEST_F(AvlAllocatorTest, AlignmentEnforcement) {
     // Without the p2roundup fix, _pick_block_after would return 4096 (bug).
     // With the fix, it rounds up to 8192.
     PExtentVector extents;
-    int64_t r = alloc->allocate(BLOCK_SIZE * 2,   // want = 8192
-                                BLOCK_SIZE * 2,   // unit = 8192
+    int64_t r = alloc->allocate(BLOCK_SIZE * 2,  // want = 8192
+                                BLOCK_SIZE * 2,  // unit = 8192
                                 0, &extents);
     ASSERT_EQ(r, BLOCK_SIZE * 2);
     ASSERT_EQ(extents.size(), 1);
@@ -357,6 +357,43 @@ TEST_F(AvlAllocatorTest, ReleaseMultipleNonAdjacent) {
     alloc->release(rs);
 
     EXPECT_EQ(alloc->get_free(), DEV_SIZE - BLOCK_SIZE);  // e2 still allocated
+}
+
+// =====================================================================
+// AvlAllocator with range_count_cap_ (max_mem > 0)
+// =====================================================================
+
+TEST(AvlAllocatorCappedTest, CappedAllocateSpills) {
+    // Cap tree to 1 entry; first range occupies it, second is dropped.
+    auto cap_alloc = std::make_unique<AvlAllocator>(
+        1ULL << 20, 4096, sizeof(range_seg_t), "capped");
+    cap_alloc->init_add_free(0, 4096);
+    cap_alloc->init_add_free(8192, 4096);  // spills — silently dropped
+
+    EXPECT_EQ(cap_alloc->get_free(), 4096);
+    PExtentVector extents;
+    ASSERT_EQ(cap_alloc->allocate(4096, 4096, 0, &extents), 4096);
+    EXPECT_EQ(extents[0].offset, 0);
+    EXPECT_EQ(cap_alloc->get_free(), 0);
+}
+
+// =====================================================================
+// AvlAllocator with range_count_cap_ — verify no crash on release
+// =====================================================================
+
+TEST(AvlAllocatorCappedTest, CappedAllocateReleaseNoCrash) {
+    auto cap_alloc = std::make_unique<AvlAllocator>(
+        1ULL << 20, 4096, sizeof(range_seg_t) * 2, "capped_r");
+    cap_alloc->init_add_free(0, 4096);
+    cap_alloc->init_add_free(8192, 4096 * 8);
+    EXPECT_EQ(cap_alloc->get_free(), 4096 * 9);
+
+    PExtentVector extents;
+    ASSERT_EQ(cap_alloc->allocate(4096, 4096, 0, &extents), 4096);
+    interval_set<uint64_t> rs;
+    rs.insert(extents[0].offset, extents[0].length);
+    cap_alloc->release(rs);
+    EXPECT_EQ(cap_alloc->get_free(), 4096 * 9);
 }
 
 }  // namespace

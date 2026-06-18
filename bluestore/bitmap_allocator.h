@@ -92,6 +92,13 @@ public:
                                       PExtentVector *res);
 
     void collect_stats(std::map<size_t, size_t> &bins_overall);
+
+    uint64_t claim_free_to_left_l1(uint64_t offs);
+    uint64_t claim_free_to_right_l1(uint64_t offs);
+
+private:
+    uint64_t _claim_free_to_left_l0(int64_t l0_pos_start);
+    uint64_t _claim_free_to_right_l0(int64_t l0_pos_start);
 };
 
 // =====================================================================
@@ -121,6 +128,8 @@ public:
     void _mark_l2_on_l1(uint64_t l2_pos, uint64_t l2_pos_end);
     void foreach_internal(std::function<void(uint64_t, uint64_t)> notify);
     void collect_stats(std::map<size_t, size_t> &bins_overall);
+    uint64_t claim_free_to_left(uint64_t offset);
+    uint64_t claim_free_to_right(uint64_t offset);
     void _shutdown() {
         last_pos = 0;
         available = 0;
@@ -531,10 +540,11 @@ int AllocatorLevel02<L1>::_allocate_l2(
     uint64_t want, uint64_t min_length, uint64_t max_length,
     int64_t hint, uint64_t *allocated, PExtentVector *res) {
     std::lock_guard l(lock);
-    constexpr uint64_t cap = 1ull << 31;
-    if (max_length == 0 || max_length >= cap)
-        max_length = cap;
+    if (max_length == 0)
+        max_length = std::numeric_limits<uint32_t>::max();
     max_length = align_down(max_length, min_length);
+    if (max_length < min_length)
+        max_length = min_length;
 
     auto d = bits_per_slot;
     int64_t pos = 0;

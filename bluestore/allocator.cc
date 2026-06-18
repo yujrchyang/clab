@@ -4,6 +4,7 @@
 #include "bluestore/allocator.h"
 #include "bluestore/avl_allocator.h"
 #include "bluestore/bitmap_allocator.h"
+#include "bluestore/hybrid_allocator.h"
 #include "common/intarith.h"
 
 namespace TOPNSPC {
@@ -32,6 +33,10 @@ Allocator *Allocator::create(const std::string &type, int64_t size,
     }
     if (type == "bitmap") {
         return new BitmapAllocator(size, block_size, name);
+    }
+    if (type == "hybrid") {
+        return new HybridAllocator(size, block_size,
+                                   sizeof(range_seg_t) * 256, name);
     }
     return nullptr;
 }

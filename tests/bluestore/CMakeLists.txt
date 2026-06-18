@@ -28,3 +28,13 @@ target_link_libraries(test_bitmap_allocator
         GTest::gtest_main
 )
 add_test(NAME test_bitmap_allocator COMMAND test_bitmap_allocator)
+
+add_executable(test_hybrid_allocator test_hybrid_allocator.cc)
+target_include_directories(test_hybrid_allocator PRIVATE ${PROJECT_SOURCE_DIR})
+target_link_libraries(test_hybrid_allocator
+    PRIVATE
+        bluestore
+        clab_test_helpers
+        GTest::gtest_main
+)
+add_test(NAME test_hybrid_allocator COMMAND test_hybrid_allocator)

@@ -119,16 +119,33 @@ protected:
 
     std::mutex lock_;
 
-private:
-    uint64_t _pick_block_after(uint64_t *cursor, uint64_t size, uint64_t align);
-    uint64_t _pick_block_fits(uint64_t size, uint64_t align);
-    int _allocate_single(uint64_t size, uint64_t unit,
-                         uint64_t *offset, uint64_t *length);
+protected:
+    /// Subclass-accessible allocation/release/shutdown
     int64_t _allocate(uint64_t want, uint64_t unit,
                       uint64_t max_alloc_size, int64_t hint,
                       PExtentVector *extents);
+    void _release(const interval_set<uint64_t> &release_set);
+    void _shutdown();
 
-    void _remove_from_tree(uint64_t start, uint64_t size);
+    uint64_t _get_free() const { return num_free_; }
+    double _get_fragmentation() const;
+
+    uint64_t _lowest_size_available() {
+        auto rs = range_size_tree_.begin();
+        return rs != range_size_tree_.end() ? rs->length() : 0;
+    }
+
+    void _try_remove_from_tree(
+        uint64_t start, uint64_t size,
+        std::function<void(uint64_t, uint64_t, bool)> cb);
+
+    void _dump() const;
+    void _foreach(
+        std::function<void(uint64_t offset, uint64_t length)> notify) const;
+
+    /// Internal helpers (also accessible to subclasses for customization)
+    /// Returns false if the range is not present in the AVL tree.
+    bool _remove_from_tree(uint64_t start, uint64_t size);
     void _process_range_removal(uint64_t start, uint64_t end,
                                 range_tree_t::iterator &rs);
     void _range_size_tree_rm(range_seg_t &r);
@@ -136,13 +153,11 @@ private:
     bool _try_insert_range(uint64_t start, uint64_t end,
                            range_tree_t::iterator *insert_pos = nullptr);
 
-    uint64_t _lowest_size_available() {
-        auto rs = range_size_tree_.begin();
-        return rs != range_size_tree_.end() ? rs->length() : 0;
-    }
-
-    void _release(const interval_set<uint64_t> &release_set);
-    void _shutdown();
+private:
+    uint64_t _pick_block_after(uint64_t *cursor, uint64_t size, uint64_t align);
+    uint64_t _pick_block_fits(uint64_t size, uint64_t align);
+    int _allocate_single(uint64_t size, uint64_t unit,
+                         uint64_t *offset, uint64_t *length);
 };
 
 }  // namespace TOPNSPC
