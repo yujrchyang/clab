@@ -1,174 +1,147 @@
-# blk — Block Device Abstraction Layer
+# blk — 块设备抽象层
 
-## Overview
+## 概述
 
-The `blk` module provides a portable block device abstraction for direct I/O on
-Linux. It wraps raw block devices (e.g. NVMe, SSD) and exposes synchronous and
-asynchronous read/write interfaces built on `libaio`.
+`blk` 模块为 Linux 上的直接 I/O 提供可移植的块设备抽象。它封装了原始块设备（如 NVMe、SSD），基于 `libaio` 实现了同步和异步读写接口。
 
-## Architecture
+## 架构
 
 ```plaintext
 ┌───────────────────────────────────────────────────────────────┐
-│                      BlockDevice (abstract)                   │
-│  sync: read / write / flush / read_random                     │
-│  async: aio_read / aio_write / aio_submit                     │
-│  mgmt: discard / invalidate_cache / collect_metadata          │
+│                      BlockDevice (抽象基类)                    │
+│  同步: read / write / flush / read_random                     │
+│  异步: aio_read / aio_write / aio_submit                      │
+│  管理: discard / invalidate_cache / collect_metadata           │
 └──────────────┬────────────────────────────────────────────────┘
-               │ inherit
+               │ 继承
 ┌──────────────▼────────────────────────────────────────────────┐
-│                      KernelDevice                             │
-│  - fd_direct_ (O_DIRECT | O_RDWR)                             │
-│  - fd_buffered_ (O_RDWR)                                      │
-│  - io_queue_ (aio_queue_t)                                    │
-│  - aio_thread_ (completion reap loop)                         │
+│                      KernelDevice                              │
+│  - fd_direct_ (O_DIRECT | O_RDWR)                              │
+│  - fd_buffered_ (O_RDWR)                                       │
+│  - io_queue_ (aio_queue_t)                                     │
+│  - aio_thread_ (完成收割循环)                                   │
 └──────────────┬────────────────────────────────────────────────┘
-               │ owns / uses
+               │ 拥有/使用
 ┌──────────────▼───────────┐   ┌────────────────────────────────────┐
-│      IOContext           │   │     io_queue_t (abstract)          │
+│      IOContext           │   │     io_queue_t (抽象基类)          │
 │  pending_aios / running  │   │  submit_batch / get_next_completed │
 │  num_pending / num_run   │   │           │                        │
 │  aio_wait / try_aio_wake │   │  ┌────────▼────────┐               │
 └──────────────┬───────────┘   │  │  aio_queue_t    │               │
-               │ contains      │  │  (libaio impl)  │               │
+               │ 包含          │  │  (libaio 实现)  │               │
 ┌──────────────▼───────────┐   │  └─────────────────┘               │
 │         aio_t            │   └────────────────────────────────────┘
-│  wraps struct iocb       │
+│  封装 struct iocb        │
 │  iov / bl / fd / priv    │
 │  pwritev / preadv        │
 │  boost::intrusive hook   │
 └──────────────────────────┘
 ```
 
-## Component Details
+## 组件详情
 
 ### BlockDevice (`block_device.h` / `block_device.cc`)
 
-Abstract base class with:
+抽象基类，提供：
 
-- **Properties**: `size`, `block_size`, `optimal_io_size`, `rotational`,
-  `support_discard`.
-- **Validation**: `is_valid_io(off, len)` — checks alignment to `block_size`
-  and range within `size`.
-- **Factory**: `BlockDevice::create(path, cb, priv)` always returns a
-  `KernelDevice` on this platform.
-- **Callback**: `aio_callback_t` is invoked when a batch of IOs completes in
-  callback mode.
+- **属性**: `size`、`block_size`、`optimal_io_size`、`rotational`、`support_discard`
+- **校验**: `is_valid_io(off, len)` — 检查与 `block_size` 的对齐及范围是否在 `size` 内
+- **工厂**: `BlockDevice::create(path, cb, priv)` 在当前平台始终返回 `KernelDevice`
+- **回调**: `aio_callback_t` 在回调模式下，一批 IO 完成时被调用
 
 ### KernelDevice (`kernel_device.h` / `kernel_device.cc`)
 
-Concrete implementation that opens the block device path **twice**:
+具体实现，将块设备路径**打开两次**：
 
-| Descriptor | Flags | Purpose |
+| 描述符 | 标志 | 用途 |
 | --- | --- | --- |
-| `fd_direct_` | `O_RDWR \| O_DIRECT \| O_CLOEXEC` | Direct (unbuffered) I/O |
-| `fd_buffered_` | `O_RDWR \| O_CLOEXEC` | Buffered I/O fallback |
+| `fd_direct_` | `O_RDWR \| O_DIRECT \| O_CLOEXEC` | 直接 I/O（无缓冲） |
+| `fd_buffered_` | `O_RDWR \| O_CLOEXEC` | 带缓冲 I/O 回退 |
 
-On open it probes device geometry via `ioctl` (BLKSSZGET, BLKIOOPT,
-BLKROTATIONAL, BLKDISCARD) and sets up a `aio_queue_t` with an adaptive
-iodepth (`max(16, min(128, size/blocksize/4))`).
+打开时通过 `ioctl`（BLKSSZGET、BLKIOOPT、BLKROTATIONAL、BLKDISCARD）探测设备几何参数，并使用自适应 iodepth（`max(16, min(128, size/blocksize/4))`）初始化 `aio_queue_t`。
 
-**Internal fallback flags:**
+**内部回退标志：**
 
-- `dio_` (default `true`): when set to `false`, falls back to buffered I/O
-- `aio_` (default `true`): when set to `false`, falls back to synchronous
-  `pread`/`pwritev` instead of libaio
-- `write_hint`: `WRITE_LIFE_*` enum is defined and accepted by `write()` /
-  `aio_write()` but currently **not forwarded** to the kernel via
-  `fcntl(F_SET_RW_HINT)`; this is a known gap
+- `dio_`（默认 `true`）：设为 `false` 时回退到带缓冲 I/O
+- `aio_`（默认 `true`）：设为 `false` 时回退到同步 `pread`/`pwritev`（而非 libaio）
+- `write_hint`：`WRITE_LIFE_*` 枚举已在 `write()` / `aio_write()` 中接受，但目前**未转发**到内核（`fcntl(F_SET_RW_HINT)`）；此为一个已知缺陷
 
-**AIO Completion Thread** (`_aio_thread`):
+**AIO 完成线程**（`_aio_thread`）：
 
-- Background thread polling `io_queue_->get_next_completed(...)` every 50 ms.
-- For each completed `aio_t`, determines completion mode:
-  - **Callback mode**: if `ioc->priv` and `aio_callback` are set, calls
-    `aio_callback(aio_callback_priv, ioc->priv)` when the last running IO
-    completes.
-  - **Wait mode**: calls `ioc->try_aio_wake()` which decrements the running
-    counter and notifies the condition variable when it reaches zero.
+- 后台线程每 50 ms 轮询 `io_queue_->get_next_completed(...)`。
+- 对每个完成的 `aio_t`，确定完成模式：
+  - **回调模式**: 如果 `ioc->priv` 和 `aio_callback` 均已设置，则最后一个正在运行的 IO 完成时调用 `aio_callback(aio_callback_priv, ioc->priv)`。
+  - **等待模式**: 调用 `ioc->try_aio_wake()` 减少正在运行计数，当计数归零时通知条件变量。
 
-**Synchronous I/O** falls back to `pread` / `pwritev`. Buffered writes
-track `io_since_flush_` so `flush()` (via `fdatasync(2)`) is a no-op
-when no writes have occurred.
+**同步 I/O** 回退到 `pread` / `pwritev`。带缓冲写入会跟踪 `io_since_flush_`，使得 `flush()`（通过 `fdatasync(2)`）在无写入发生时为空操作。
 
 ### IOContext (`io_context.h` / `io_context.cc`)
 
-Tracks per-I/O-context in-flight operations:
+跟踪每个 IO 上下文中正在进行的操作：
 
-| State | List | Counter |
+| 状态 | 链表 | 计数器 |
 | --- | --- | --- |
-| Not yet submitted | `pending_aios` | `num_pending` |
-| Submitted / in-flight | `running_aios` | `num_running` |
+| 尚未提交 | `pending_aios` | `num_pending` |
+| 已提交/正在进行 | `running_aios` | `num_running` |
 
-- `aio_wait()` — blocks the caller (via `condition_variable`) until
-  `num_running == 0`.
-- `try_aio_wake()` — thread-safe decrement of `num_running`; notifies
-  when zero.
-- `release_running_aios()` — clears `running_aios` (caller must guarantee
-  no IOs are in-flight).
+- `aio_wait()` — 阻塞调用者（通过 `condition_variable`），直到 `num_running == 0`
+- `try_aio_wake()` — 线程安全地减少 `num_running`；归零时通知
+- `release_running_aios()` — 清空 `running_aios`（调用者必须保证无 IO 正在进行）
 
 ### aio_t (`aio.h` / `aio.cc`)
 
-Wraps a single `struct iocb` (libaio) and associated metadata:
+封装单个 `struct iocb`（libaio）及其关联元数据：
 
-- `io_prep_pwritev` / `io_prep_preadv` to build the iocb.
-- `iov`: a `boost::container::small_vector<struct iovec, 4>` for
-  scatter/gather.
-- `bl`: holds a `bufferlist` reference to keep data alive during async
-  writes.
-- Intrusive list hook (`boost::intrusive::list_member_hook<>`) enables
-  `aio_list_t` — an intrusive list used for zero-allocation batch tracking.
-- `rval` stores the completion result, set by the reap loop via
-  `reinterpret_cast<aio_t*>(event.obj)`.
+- `io_prep_pwritev` / `io_prep_preadv` 构建 iocb
+- `iov`: 一个 `boost::container::small_vector<struct iovec, 4>` 用于 scatter/gather
+- `bl`: 持有 `bufferlist` 引用，确保异步写入期间数据存活
+- 侵入式链表钩子（`boost::intrusive::list_member_hook<>`）支持 `aio_list_t` — 一种用于零分配批量跟踪的侵入式链表
+- `rval` 存储完成结果，由收割循环通过 `reinterpret_cast<aio_t*>(event.obj)` 设置
 
 ### io_queue_t / aio_queue_t (`aio.h` / `aio.cc`)
 
-Abstract interface:
+抽象接口：
 
-- `init(fds)` — set up the submission queue.
-- `shutdown()` — tear down.
-- `submit_batch(begin, end, priv, retries)` — submit a range of IOs;
-  retries on `EAGAIN` with exponential backoff.
-- `get_next_completed(timeout_ms, paio, max)` — reap up to `max`
-  completions.
+- `init(fds)` — 设置提交队列
+- `shutdown()` — 销毁
+- `submit_batch(begin, end, priv, retries)` — 提交一组 IO；遇到 `EAGAIN` 时以指数退避重试
+- `get_next_completed(timeout_ms, paio, max)` — 收割最多 `max` 个完成项
 
-`aio_queue_t` implements these with `libaio` (`io_setup` / `io_submit` /
-`io_getevents` / `io_destroy`).
+`aio_queue_t` 通过 `libaio`（`io_setup` / `io_submit` / `io_getevents` / `io_destroy`）实现上述接口。
 
-## I/O Lifecycle
+## I/O 生命周期
 
 ```plaintext
 aio_read/aio_write
         │
         ▼
-KernelDevice creates aio_t,
-appends to ioc->pending_aios
+KernelDevice 创建 aio_t，
+追加到 ioc->pending_aios
   num_pending++
         │
         ▼
 aio_submit(ioc)
-  splice pending → running
+  将 pending 移至 running
   num_running += num_pending, num_pending = 0
   io_queue_->submit_batch(...)
         │
         ▼
-_aio_thread (polling loop)
+_aio_thread (轮询循环)
   io_queue_->get_next_completed()
-  check res == length
-  callback mode OR try_aio_wake()
+  检查 res == length
+  回调模式 或 try_aio_wake()
   io_since_flush_ = true
 ```
 
-## Build
+## 构建
 
-`CMakeLists.txt` builds a shared library `libblk.so` linking against `common`
-and `aio` (libaio).
+`CMakeLists.txt` 构建共享库 `libblk.so`，链接 `common` 和 `aio`（libaio）。
 
-## Files
+## 文件
 
-| File | Role |
+| 文件 | 角色 |
 | --- | --- |
-| `block_device.h/cc` | Abstract `BlockDevice` base + factory |
-| `kernel_device.h/cc` | `KernelDevice` implementation |
-| `io_context.h/cc` | `IOContext` — in-flight IO tracker |
-| `aio.h/cc` | `aio_t` (single op) + `aio_queue_t` (libaio queue) |
+| `block_device.h/cc` | 抽象 `BlockDevice` 基类 + 工厂 |
+| `kernel_device.h/cc` | `KernelDevice` 实现 |
+| `io_context.h/cc` | `IOContext` — 进行中 IO 跟踪器 |
+| `aio.h/cc` | `aio_t`（单次操作）+ `aio_queue_t`（libaio 队列） |
