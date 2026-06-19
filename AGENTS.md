@@ -27,7 +27,7 @@ never migrate across blank lines.
 ## Progress
 
 ### Goal
-Implement the kv abstraction layer (RocksDBStore + MemDB) and bluestore layer (FreelistManager + Allocator) for clab, modeled after Ceph's `src/kv/*` and `src/os/bluestore/*`.
+Implement BlueStore 引擎 (BlueFS + BlueRocksEnv + BlueStore) for clab, modeled after Ceph's `src/os/bluestore/*`, layered on top of existing kv/ (RocksDBStore) and bluestore/ (FreelistManager + Allocator) infrastructure.
 
 ### Key Context
 - `TOPNSPC` macro defined in `common/common_fwd.h` → expands to `clab`
@@ -131,8 +131,57 @@ decode(e, bl.cbegin());   // denc(o, p) 顶层包装
 - HybridAllocator allocation strategy: always try AVL first, bitmap as fallback (simplified from Ceph's conditional strategy)
 - `_add_to_tree()` claim-free optimization reclaims adjacent free extents from bitmap child before AVL insertion
 
+### Development Plan (3 phases, bottom-up)
+
+开发顺序 **BlueFS → BlueRocksEnv → BlueStore**，详见 `docs/plan.md`。
+
+#### Phase 1: BlueFS (11 steps)
+| # | Step | Test Strategy |
+|---|------|---------------|
+| 1.1 | `bluefs_types` — 数据结构 + DENC | encode/decode roundtrip |
+| 1.2 | BlueFSConfig + RocksDBBlueFSVolumeSelector | 逻辑测试，无 IO |
+| 1.3 | 设备层 + 超级块 (add_block_device, _write_super) | tempfile 读写 |
+| 1.4 | mkfs + mount + 日志重放 | mkfs→mount→umount 循环 |
+| 1.5 | 目录操作 (mkdir, rmdir, lookup) | 创建/列出/删除 |
+| 1.6 | 文件创建/关闭 (open_for_write/read, close_writer/reader) | 文件生命周期 |
+| 1.7 | 文件读写 (append_try_flush, read, read_random, fsync) | 写入→读回验证 |
+| 1.8 | 日志持久化 (dirty tracking, flush_and_sync_log) | 写→umount→mount→验证 |
+| 1.9 | 空间分配 (_allocate, 设备回退, shared_alloc) | 多设备分配 |
+| 1.10 | 异步压缩 (_compact_log_async) | 增长→压缩→验证 |
+| 1.11 | 文件管理 (truncate, unlink, rename, stat) + 边界 | 错误路径 |
+
+#### Phase 2: BlueRocksEnv (7 steps)
+| # | Step | Test Strategy |
+|---|------|---------------|
+| 2.1 | 辅助函数 (err_to_status, split) | 单元测试 |
+| 2.2 | BlueRocksSequentialFile + NewSequentialFile | BlueFS 写入→Env 读取 |
+| 2.3 | BlueRocksRandomAccessFile + NewRandomAccessFile | 随机读 + GetUniqueId |
+| 2.4 | BlueRocksWritableFile + NewWritableFile | Append→Sync→Close 验证 |
+| 2.5 | 目录/锁/状态操作 (FileExists, GetChildren, LockFile 等) | 完整生命周期 |
+| 2.6 | CephRocksdbLogger | dout 输出验证 |
+| 2.7 | BlueRocksEnv 集成 + EnvMirror | 与 POSIX Env 双路验证 |
+
+#### Phase 3: BlueStore (15 steps)
+| # | Step | Test Strategy |
+|---|------|---------------|
+| 3.1 | bluestore_types (pextent_t, blob_t, onode_t, cnode_t) | DENC roundtrip |
+| 3.2 | BlueStoreConfig | struct init + file load |
+| 3.3 | Onode key 编码 (_key_encode/decode) | roundtrip + 排序 |
+| 3.4 | Blob 内存管理 + use_tracker | split, get/put_ref |
+| 3.5 | ExtentMap (seek_lextent, punch_hole, add/rm) | 插入/查找/删除 |
+| 3.6 | Onode + Collection (KV 读写 + shard) | 编码→KV→解码 |
+| 3.7 | mkfs + mount (FM + Alloc + BlockDev + BlueFS) | 全流程启动 |
+| 3.8 | TransContext + OpSequencer (状态机) | 状态推进 + 顺序保证 |
+| 3.9 | Small Write (≤1 AU, read-modify-write) | 写入→验证 extent |
+| 3.10 | Big Write (多 AU 对齐) | 写入→验证校验和 |
+| 3.11 | Read (_do_read, cache, csum verify) | 写入→读取→比较 |
+| 3.12 | KV pipeline (kv_sync_thread, kv_finalize_thread, release) | 完整事务生命周期 |
+| 3.13 | Zero + Remove + Attrs | 数据打孔→删除→空间释放 |
+| 3.14 | Collection List | 对象分页列出 |
+| 3.15 | 集成测试 | 压力 + 持久化 + 边界 |
+
 ### Next Steps
-- BlueStore core engine with KV + FreelistManager + Allocator integration
+开发已进入设计收尾阶段。下一步：按 `docs/plan.md` 开始实现 **Phase 1: BlueFS**。
 
 ### Relevant Files
 - `kv/key_value_db.h`: Abstract base (TransactionImpl, IteratorImpl, WholeSpaceIteratorImpl, PrefixIteratorImpl, KeyValueDB)
@@ -158,8 +207,8 @@ decode(e, bl.cbegin());   // denc(o, p) 顶层包装
 - `tests/kv/CMakeLists.txt`: test targets linking kv + RocksDB + clab_test_helpers + GTest
 - `docs/design/keyvalue-db.md`: full design specification
 - `docs/design/freelist-manager.md`: FreelistManager/BitmapFreelistManager design analysis (Ceph reference: `src/os/bluestore/FreelistManager.*`, `BitmapFreelistManager.*`)
-
-### Next Steps (updated)
-- ~~Implement FreelistManager / BitmapFreelistManager in `bluestore/` layer~~ ✓
-- ~~Implement Allocator (AvlAllocator / BitmapAllocator / HybridAllocator)~~ ✓
-- BlueStore core engine with KV + FreelistManager + Allocator integration
+- `docs/design/allocator.md`: Allocator design (Avl + Bitmap + Hybrid)
+- `docs/design/block-device.md`: Block device abstraction design
+- `docs/design/bluestore.md`: BlueStore engine design
+- `docs/design/bluefs.md`: BlueFS user-space filesystem design
+- `docs/plan.md`: Detailed development plan (3 phases, 33 steps)
