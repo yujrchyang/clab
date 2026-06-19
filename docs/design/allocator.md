@@ -160,59 +160,132 @@ _add_to_tree(start, size):
 
 #### 2.3.1 三级位图结构
 
+BitmapAllocator 使用三级位图管理空闲空间，每一层以不同粒度聚合下一层的状态，实现快速 skip 全满/全空区域：
+
 ```plaintext
-    | AU | AU |                    ......                    |   磁盘
-    | 0  | 1  |                    ......                    |   L0
-    .                         .
-       .     64 bytes (512 bits) .
-          .    (1 slotset)    .
-              .         .
-              | 00 | 01 | 11 |                               |   L1
-               .           .
-            | 0 | 0 | 1 |                                    |   L2
+                          存储设备 (按 alloc unit 划分)
+  L0:  ┌─┬─┬─┬─┬─┬─┬─┬─┬─┬─┬─┬─┬─┬─┬─┬─┬─┬─┬─┬─┬─┬─┬─┬─┬─┬─┬─┬─┬ ...
+       │1│1│0│1│0│1│1│1│ │1│1│1│1│1│1│1│1│ │0│0│0│0│0│0│0│0│ ...
+       └─┴─┴─┴─┴─┴─┴─┴─┘ └─┴─┴─┴─┴─┴─┴─┴─┘ └─┴─┴─┴─┴─┴─┴─┴─┘
+         uint64_t slot[0]    uint64_t slot[1]    uint64_t slot[2]   ...
+         (64 bit, 每 bit = 1 AU)
+
+        8 个连续 slot 组成 1 个 slotset (64 字节 = 1 cache line)
+        └──────── 8 × uint64_t = 512 bits = bits_per_slotset ──────┘
+
+  L1:  ┌──────┬──────┬──────┬──────┬──────┬──────┬──────┬──────┬─ ...
+       │  11  │  01  │  00  │  01  │  11  │  00  │  01  │  00  │
+       └──────┴──────┴──────┴──────┴──────┴──────┴──────┴──────┘
+       每 2 bit = 1 个 L1 条目，对应 1 个 L0 slotset (512 AU):
+         00 (L1_ENTRY_FULL)    = slotset 内全部已分配
+         01 (L1_ENTRY_PARTIAL) = slotset 内部分空闲
+         11 (L1_ENTRY_FREE)    = slotset 内全部空闲
+
+       32 个 L1 条目 打包在 1 个 uint64_t slot 中 (32 × 2 bit = 64 bit)
+
+  L2:  ┌──────────────────────┬──────────────────────┬───────────────── ...
+       │   0   │  1   │  1   │   0   │  1   │  1   │   1   │  0   │
+       └──────────────────────┴──────────────────────┴─────────────────
+       每 1 bit = 1 个 L2 条目，对应 32 个 L1 条目 (1 个 L2 slot = 64 个 L1 条目):
+         0 = 该区域全部已分配 (无可用空间)
+         1 = 该区域有可用空间 (跳过到 L1 进一步检查)
 ```
 
-**层级定义**:
+**粒度与容量关系** (以 alloc unit = 4KB 为例):
 
-| 层级 | 粒度 | 每 slot 条目 | 条目含义 |
+| 层级 | 粒度 | 每个 slot 覆盖 | 实现 |
 | --- | --- | --- | --- |
-| L0 | alloc unit (e.g. 4KB) | 64 (uint64_t 每个 bit 表示一个 AU) | 1=空闲，0=已分配 |
-| L1 | 64 * AU (512 个 AU ≈ 2MB @ 4KB) | 32 (每 2 bit 描述一个 L0 slotset) | 00=全分配，01=部分分配，11=全空闲 |
-| L2 | 32 * L1 粒度 (≈ 64MB @ 4KB) | 64 (每 1 bit 描述一个 L1 slotset) | 0=全分配，1=有可用空间 |
+| L0 | 1 AU = 4 KB | 64 × 4 KB = 256 KB | `vector<uint64_t>`，每 bit 表示一个 AU (1=空闲, 0=已分配) |
+| L1 | 512 AU ≈ 2 MB | 32 × 2 MB = 64 MB | `vector<uint64_t>`，每 2 bit 编码一个 L0 slotset 状态 |
+| L2 | 32 × 2 MB = 64 MB | 64 × 64 MB = 4 GB | `vector<uint64_t>`，每 1 bit 编码一个 L1 slot 中是否有可用空间 |
 
-**对齐优化**:
+**对齐优化**: 每层以 `slots_per_slotset = 8` 个 `uint64_t` (64 字节 = 1 cache line) 为单位操作，最大化 cache 利用率。
 
-- `slots_per_slotset = 8` 个 `uint64_t` = 64 字节 = x86\_64 cache line 大小
-- 每一层的分配/标记以 slotset 为单位操作，最大化 cache 利用率
+**`available` 计数器**: `AllocatorLevel02` 中维护 `uint64_t available`，精确跟踪当前空闲字节数，`allocate()` / `release()` 在锁内原子更新。
 
-#### 2.3.2 分配算法
+#### 2.3.2 分配算法 (L2 → L1 → L0 三级调用)
+
+分配从顶层 L2 向下穿透到 L0，找到连续空闲 AU 后向上逐层更新位图：
 
 ```plaintext
-_allocate_l2(want, min_length, max_length, hint, allocated, extents):
-  1. 若 hint != 0 → last_pos = align(hint / l2_granularity, L1_ENTRIES_PER_SLOT)
-  2. 两轮扫描:
-     第一轮: [last_pos → end]
-     第二轮: [0 → last_pos) （绕回）
-  3. 外层槽扫描 (以 l2 slot 为单位):
-     - slot_val == all_slot_clear → 跳过（全分配）
-     - slot_val == all_slot_set → 全空闲，分配 l1 全部
-     - 否则 → 找空闲 bit，分配单个 l1 slotset
-  4. 内层 _allocate_l1() → _allocate_l0():
-     - 遍历 l0 数组的 slot（uint64_t）
-     - slot_val == all_slot_set → 取整个 slot
-     - 否则逐 bit 扫描，找连续空闲位
-     - 使用 __builtin_ffsll / __builtin_popcountll 等硬件加速指令
-     - _fragment_and_emplace(): 合并相邻 extent，按 max_length 切片
+BitmapAllocator::allocate(want, unit, max_alloc_size, hint, extents)
+  │
+  └─ AllocatorLevel02::_allocate_l2(want, unit, max_alloc_size, hint, &allocated, extents)
+       │
+       │  L2 层: 两轮扫描 [hint→end) + [0→hint)，跳过全 0 slot
+       │
+       ├─ 对每个非空 L2 bit:
+       │    │
+       │    ├─ AllocatorLevel01Loose::_allocate_l1(rem, unit, max_length, l1s, l1e, &allocated, extents)
+       │    │    │
+       │    │    │  L1 层: 遍历 32 个 L1 条目 (1 个 uint64_t slot)
+       │    │    │
+       │    │    ├─ L1_ENTRY_FULL  (00) → 跳过 (全分配)
+       │    │    ├─ L1_ENTRY_FREE  (11) + 剩余 ≥ 整个 slotset → 整块分配，标记全 slotset
+       │    │    └─ L1_ENTRY_PARTIAL (01) → 下钻到 L0:
+       │    │         │
+       │    │         └─ AllocatorLevel01Loose::_allocate_l0(rem, max_length, l0s, l0e, &allocated, extents)
+       │    │              │
+       │    │              │  L0 层: 逐 uint64_t slot 扫描
+       │    │              │
+       │    │              ├─ slot == 0  (all_slot_clear) → 跳过
+       │    │              ├─ slot == ~0 (all_slot_set)   → 取整个 slot (64 AU)
+       │    │              └─ 否则 → 逐 bit 扫描 (find_next_set_bit / __builtin_ctzll)
+       │    │                       找连续 1 bit 序列 → 确定连续空闲 AU
+       │    │
+       │    │  找到连续空闲 AU 后:
+       │    │    ├─ _fragment_and_emplace(): 合并相邻 extent，按 max_length 切片
+       │    │    ├─ _mark_alloc_l0(): L0 对应 bit 清 0
+       │    │    └─ 回到 L1 → _mark_l1_on_l0(): 若整个 slotset 变满 → L1 条目改 00
+       │    │
+       │    └─ 回 L2: 若对应的 L1 slotset 全空 (全部已分配) → L2 对应 bit 清 0
+       │
+       └─ 分配完成后: available -= allocated
+           返回实际分配字节数 (或 -ENOSPC)
 ```
 
-#### 2.3.3 释放算法
+**硬件加速**: L0 slot 内连续空闲位扫描使用 `__builtin_ctzll` (find first set) 和 `__builtin_popcountll`，L1/L2 的跳过判断直接比较 `== 0` / `== ~0`，无逐位循环。
+
+#### 2.3.3 释放算法 (自下而上：L0 → L1 → L2)
+
+释放反向遍历三级，先标记 L0，再向上聚合更新 L1、L2：
 
 ```plaintext
-_free_l2(release_set):
-  for each (offset, length) in release_set:
-    1. l1._free_l1(offset, length) → 标记 L0/L1 位图
-    2. _mark_l2_free(l2_pos, l2_pos_end) → 更新 L2 位图
-    3. available += released_length
+BitmapAllocator::release(release_set)
+  │
+  └─ AllocatorLevel02::_free_l2(release_set)
+       │
+       for each (offset, length) in release_set:
+         │
+         ├─ 1. AllocatorLevel01Loose::_free_l1(offset, length)
+         │      │
+         │      ├─ L0 层: _mark_free_l0(l0_start, l0_end)
+         │      │    按 3 段式写入: 头部半 slot (bit 操作) → 中间整 slot (整字写入 ~0)
+         │      │    → 尾部半 slot (bit 操作)
+         │      │
+         │      └─ L1 层: _mark_l1_on_l0(l0_start_aligned, l0_end_aligned)
+         │            对每个受影响的 L0 slotset:
+         │              - agg_and (AND 聚合): 全 1 才保持全空闲 (11)
+         │              - agg_or  (OR 聚合):  全 0 才变成全分配 (00)
+         │              否则 → 部分空闲 (01)
+         │
+         ├─ 2. AllocatorLevel02::_mark_l2_free(l2_pos, l2_pos_end)
+         │     受影响 L2 条目置 1 (标记该区域有可用空间)
+         │
+         └─ 3. available += released  (全局空闲计数器递增)
+```
+
+**提取(claim-free)算法** (供 HybridAllocator 回收 bitmap 中空闲块到 AVL):
+
+```plaintext
+AllocatorLevel02::claim_free_to_left(offset):
+  从 offset 向左扫描 L0 连续 1 bit，
+  逐 bit 清 0 (标记为已分配)，
+  更新 L1 聚合，更新 L2 位图，
+  返回回收字节数。
+
+claim_free_to_right(offset): 同理向右扫描，
+  返回回收字节数。
 ```
 
 ### 2.4 HybridAllocator 设计
