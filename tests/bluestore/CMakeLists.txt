@@ -69,3 +69,14 @@ target_link_libraries(test_bluefs
         GTest::gtest_main
 )
 add_test(NAME test_bluefs COMMAND test_bluefs)
+
+add_executable(test_blue_rocks_env test_blue_rocks_env.cc)
+target_include_directories(test_blue_rocks_env PRIVATE ${PROJECT_SOURCE_DIR})
+target_link_libraries(test_blue_rocks_env
+    PRIVATE
+        bluestore
+        blk
+        clab_test_helpers
+        GTest::gtest_main
+)
+add_test(NAME test_blue_rocks_env COMMAND test_blue_rocks_env)

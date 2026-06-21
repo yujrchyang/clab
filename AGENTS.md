@@ -139,6 +139,19 @@ decode(e, bl.cbegin());   // denc(o, p) 顶层包装
   - Fixes: KernelDevice buffered IO alignment skip, `close_writer` double-flush, `umount` log metadata loss, `pending_release` vector resize, `_flush_F` buffer clear, fsync deadlock (release dirty lock before log sync)
   - **Code review fixes (Phase 1.11 completion):** `lock_file`/`unlock_file`/`invalidate_cache`/`flush_range`/`preallocate`/`get_used` all implemented; `OP_DIR_UNLINK` replay assertion (refs>0); `OP_FILE_UPDATE_INC` delta offset validation; truncate uses `op_file_update` instead of `op_file_update_inc`; `_flush_data` reverted to direct buffer write
   - 55 tests total, all pass
+- **BlueRocksEnv Phase 2.1–2.7 implementation:**
+  - `blue_rocks_env.h` / `blue_rocks_env.cc`: Full `BlueRocksEnv : rocksdb::EnvWrapper` implementation
+  - `err_to_status()` helper converting POSIX errno → `rocksdb::Status`
+  - `split()` helper parsing `"dir/file"` → `{dir, file}`
+  - `BlueRocksSequentialFile` / `NewSequentialFile`: wraps BlueFS `FileReader`, supports Read/Skip/InvalidateCache
+  - `BlueRocksRandomAccessFile` / `NewRandomAccessFile`: random reads via `read_random()`, GetUniqueId, Prefetch, Hint
+  - `BlueRocksWritableFile` / `NewWritableFile`: Append/PositionedAppend/Truncate/Close/Flush/Sync/GetFileSize/GetUniqueId/InvalidateCache/RangeSync/Allocate
+  - `ReuseWritableFile`: rename + open_for_write(overwrite=true)
+  - `BlueRocksDirectory` / `NewDirectory`: Fsync → sync_metadata
+  - `FileExists`, `GetChildren`, `DeleteFile`, `CreateDir`, `CreateDirIfMissing`, `DeleteDir`, `GetFileSize`, `GetFileModificationTime`, `RenameFile`, `AreFilesSame`, `LockFile`, `UnlockFile`, `GetAbsolutePath`, `GetTestDirectory`
+  - `BlueFSRocksdbLogger`: stderr-based rocksdb::Logger, factory `CreateRocksdbLogger()`
+  - Absolute path escape: files starting with `/` forwarded to POSIX Env
+  - 29 tests covering all operations, all pass
 
 ### Key Decisions
 - Single default ColumnFamily (no hash sharding, no `parse_sharding_def`)
@@ -183,15 +196,15 @@ decode(e, bl.cbegin());   // denc(o, p) 顶层包装
 | 1.11 | 文件管理 (truncate, unlink, rename, stat) + 边界 | 错误路径 | ✅ |
 
 #### Phase 2: BlueRocksEnv (7 steps)
-| # | Step | Test Strategy |
-|---|------|---------------|
-| 2.1 | 辅助函数 (err_to_status, split) | 单元测试 |
-| 2.2 | BlueRocksSequentialFile + NewSequentialFile | BlueFS 写入→Env 读取 |
-| 2.3 | BlueRocksRandomAccessFile + NewRandomAccessFile | 随机读 + GetUniqueId |
-| 2.4 | BlueRocksWritableFile + NewWritableFile | Append→Sync→Close 验证 |
-| 2.5 | 目录/锁/状态操作 (FileExists, GetChildren, LockFile 等) | 完整生命周期 |
-| 2.6 | CephRocksdbLogger | dout 输出验证 |
-| 2.7 | BlueRocksEnv 集成 + EnvMirror | 与 POSIX Env 双路验证 |
+| # | Step | Test Strategy | Status |
+|---|------|---------------|--------|
+| 2.1 | 辅助函数 (err_to_status, split) | 单元测试 | ✅ |
+| 2.2 | BlueRocksSequentialFile + NewSequentialFile | BlueFS 写入→Env 读取 | ✅ |
+| 2.3 | BlueRocksRandomAccessFile + NewRandomAccessFile | 随机读 + GetUniqueId | ✅ |
+| 2.4 | BlueRocksWritableFile + NewWritableFile | Append→Sync→Close 验证 | ✅ |
+| 2.5 | 目录/锁/状态操作 (FileExists, GetChildren, LockFile 等) | 完整生命周期 | ✅ |
+| 2.6 | BlueFSRocksdbLogger | dout 输出验证 | ✅ |
+| 2.7 | BlueRocksEnv 集成 + EnvMirror | 与 POSIX Env 双路验证 | ✅ |
 
 #### Phase 3: BlueStore (15 steps)
 | # | Step | Test Strategy |
@@ -213,8 +226,8 @@ decode(e, bl.cbegin());   // denc(o, p) 顶层包装
 | 3.15 | 集成测试 | 压力 + 持久化 + 边界 |
 
 ### Next Steps
-1. Phase 2.1: BlueRocksEnv 辅助函数 (err_to_status, split)
-2. Phase 2.2: BlueRocksSequentialFile + NewSequentialFile
+1. Phase 3.1: bluestore_types (bluestore_pextent_t, bluestore_blob_t, bluestore_onode_t, bluestore_cnode_t + DENC)
+2. Phase 3.2: BlueStoreConfig struct init + file load
 
 ### Relevant Files
 - `kv/key_value_db.h`: Abstract base (TransactionImpl, IteratorImpl, WholeSpaceIteratorImpl, PrefixIteratorImpl, KeyValueDB)

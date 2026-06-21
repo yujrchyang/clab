@@ -153,6 +153,9 @@ public:
         bufferlist tail_block;
         std::mutex lock;
 
+        int writer_type = 0;
+        int write_hint = 0;
+
         std::vector<IOContext *> iocv{nullptr, nullptr, nullptr};
         std::vector<bool> dirty_devs{false, false, false};
 
@@ -190,6 +193,15 @@ public:
             if (p >= bl_off && p < bl_off + bl.length())
                 return bl_off + bl.length() - p;
             return 0;
+        }
+
+        void skip(size_t n) { pos += n; }
+
+        void invalidate_cache(uint64_t offset, uint64_t length) {
+            if (offset >= bl_off && offset < get_buf_end()) {
+                bl.clear();
+                bl_off = 0;
+            }
         }
     };
 
