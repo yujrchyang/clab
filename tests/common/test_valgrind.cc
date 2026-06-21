@@ -5,7 +5,7 @@
 namespace {
 int dummy;
 int array[8];
-}
+}  // namespace
 
 TEST(ValgrindTest, AnnotateHappensAfter) {
     ANNOTATE_HAPPENS_AFTER(&dummy);

@@ -108,12 +108,12 @@ protected:
 
         vs_extra_.reset(new RocksDBBlueFSVolumeSelector(
             256ULL << 20, 1ULL << 30, 512ULL << 20,
-            64ULL << 20,        // level0_size = 64MB
-            256ULL << 20,       // level_base = 256MB
-            10,                 // level_multiplier = 10
-            0.9,                // reserved_factor = 0.9
-            0,                  // reserved = 0
-            true));             // use_db_extra = true
+            64ULL << 20,   // level0_size = 64MB
+            256ULL << 20,  // level_base = 256MB
+            10,            // level_multiplier = 10
+            0.9,           // reserved_factor = 0.9
+            0,             // reserved = 0
+            true));        // use_db_extra = true
     }
 
     std::unique_ptr<RocksDBBlueFSVolumeSelector> vs_no_extra_;

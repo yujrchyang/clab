@@ -132,9 +132,6 @@ void BlueFS::_init_alloc() {
         if (total > skip) {
             alloc_[id]->init_add_free(skip, total - skip);
         }
-
-        
-
     }
 }
 
@@ -182,7 +179,7 @@ int BlueFS::_open_super() {
 
     bufferlist bl;
     int r = bdev_[BDEV_DB]->read(SUPER_OFFSET, SUPER_LENGTH, &bl,
-                                  ioc_[BDEV_DB], false);
+                                 ioc_[BDEV_DB], false);
     if (r < 0) return r;
 
     try {
@@ -240,10 +237,9 @@ int BlueFS::_allocate(uint8_t prefer_bdev, uint64_t len, uint64_t alloc_unit,
         int64_t hint_val = 0;
         if (hint && id == prefer_bdev) hint_val = *hint;
 
-
         PExtentVector extents;
         int64_t alloc_len = alloc_[id]->allocate(need, alloc_unit, 0,
-                                                   hint_val, &extents);
+                                                 hint_val, &extents);
 
         if (alloc_len <= 0) continue;
 
@@ -266,7 +262,6 @@ int BlueFS::_allocate(uint8_t prefer_bdev, uint64_t len, uint64_t alloc_unit,
 
         return 0;
     }
-
 
     return -ENOSPC;
 }
@@ -337,7 +332,7 @@ void BlueFS::_flush_special(FileWriter *h) {
 }
 
 bufferlist BlueFS::FileWriter::flush_buffer(uint64_t block_size,
-                                             uint64_t block_mask) {
+                                            uint64_t block_mask) {
     bufferlist bl;
 
     // Prepend any tail_block from a previous partial write
@@ -385,7 +380,7 @@ int BlueFS::_flush_data(FileWriter *h, uint64_t offset, uint64_t length,
         t.substr_of(bl, bloff, x_len);
 
         int r = bdev_[it->bdev]->write(it->offset + x_off, t, buffered,
-                                        WRITE_LIFE_NOT_SET);
+                                       WRITE_LIFE_NOT_SET);
         if (r < 0) return r;
         h->dirty_devs[it->bdev] = true;
 
@@ -469,7 +464,7 @@ int BlueFS::_flush_log_data(bufferlist &bl) {
         bufferlist t;
         t.substr_of(bl, bloff, x_len);
         int r = bdev_[it->bdev]->write(it->offset + x_off, t, false,
-                                        WRITE_LIFE_NOT_SET);
+                                       WRITE_LIFE_NOT_SET);
         if (r < 0) return r;
         log_.writer->dirty_devs[it->bdev] = true;
         bloff += x_len;
@@ -638,7 +633,7 @@ int BlueFS::_replay(bool no_stdout) {
 
         bufferlist bl;
         int r = bdev_[it->bdev]->read(dev_off, dev_len, &bl,
-                                       ioc_[it->bdev], false);
+                                      ioc_[it->bdev], false);
         if (r < 0) return r;
         if (bl.length() == 0) break;
 
@@ -679,7 +674,7 @@ int BlueFS::_replay(bool no_stdout) {
 
                 bufferlist more_bl;
                 r = bdev_[rit->bdev]->read(rd_off, rd_len, &more_bl,
-                                            ioc_[rit->bdev], false);
+                                           ioc_[rit->bdev], false);
                 if (r < 0) return r;
                 bl.claim_append(more_bl);
                 more -= p2roundup((uint64_t)r_len, bs);
@@ -856,7 +851,7 @@ int BlueFS::_replay(bool no_stdout) {
         pos += p2roundup(raw_tx_size, bs);
         continue;
 
-    next_block:
+next_block:
         continue;
     }
 
@@ -1084,11 +1079,11 @@ int64_t BlueFS::_read(FileReader *h, uint64_t off, size_t len,
     auto *buf = &h->buf;
     bool prefetch = !outbl && !out;
 
-
-
     if (!h->ignore_eof && off + len > h->file->fnode.size) {
-        if (off > h->file->fnode.size) len = 0;
-        else len = h->file->fnode.size - off;
+        if (off > h->file->fnode.size)
+            len = 0;
+        else
+            len = h->file->fnode.size - off;
     }
 
     if (outbl) outbl->clear();
@@ -1118,10 +1113,10 @@ int64_t BlueFS::_read(FileReader *h, uint64_t off, size_t len,
             }
 
             bool use_buffered = (h->file->fnode.ino == 1)
-                                    ? false
-                                    : cfg_.buffered_io;
+                ? false
+                : cfg_.buffered_io;
             int r = bdev_[p->bdev]->read(p->offset + x_off, l, &buf->bl,
-                                          ioc_[p->bdev], use_buffered);
+                                         ioc_[p->bdev], use_buffered);
             if (r < 0) return r;
 
             continue;
@@ -1152,8 +1147,10 @@ int64_t BlueFS::_read(FileReader *h, uint64_t off, size_t len,
 int64_t BlueFS::_read_random(FileReader *h, uint64_t off, uint64_t len,
                              char *out) {
     if (!h->ignore_eof && off + len > h->file->fnode.size) {
-        if (off > h->file->fnode.size) len = 0;
-        else len = h->file->fnode.size - off;
+        if (off > h->file->fnode.size)
+            len = 0;
+        else
+            len = h->file->fnode.size - off;
     }
 
     int64_t ret = 0;
@@ -1166,10 +1163,10 @@ int64_t BlueFS::_read_random(FileReader *h, uint64_t off, uint64_t len,
         l = std::min<uint64_t>(l, uint64_t(1) << 30);
 
         bool use_buffered = (h->file->fnode.ino == 1)
-                                ? false
-                                : cfg_.buffered_io;
+            ? false
+            : cfg_.buffered_io;
         int r = bdev_[p->bdev]->read_random(p->offset + x_off, l, out,
-                                             use_buffered);
+                                            use_buffered);
         if (r < 0) return r;
 
         off += l;
@@ -1502,8 +1499,7 @@ uint64_t BlueFS::_estimate_log_size() {
     int avg_dir_size = 40;
     int avg_file_size = 12;
     uint64_t size = 4096 * 2;
-    size += nodes_.file_map.size() * (1 + sizeof(bluefs_fnode_t) +
-                                      sizeof(bluefs_fnode_delta_t));
+    size += nodes_.file_map.size() * (1 + sizeof(bluefs_fnode_t) + sizeof(bluefs_fnode_delta_t));
     size += nodes_.dir_map.size() * (1 + avg_dir_size);
     size += nodes_.file_map.size() * (1 + avg_dir_size + avg_file_size);
     size += 24;  // OP_JUMP_SEQ
@@ -1585,7 +1581,7 @@ int BlueFS::_compact_log_async() {
         encode(compacted_t, compacted_bl);
         uint64_t bs = super_.block_size;
         uint64_t padding = p2roundup<uint64_t>(compacted_bl.length(), bs) -
-                           compacted_bl.length();
+            compacted_bl.length();
         if (padding > 0) {
             compacted_bl.append_zero(padding);
         }

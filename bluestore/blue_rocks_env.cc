@@ -25,11 +25,10 @@ public:
               va_list ap) override {
         if (log_level < GetInfoLogLevel()) return;
         static const char *kLevelNames[] = {
-            "DEBUG", "INFO", "WARN", "ERROR", "FATAL", "HEADER"
-        };
+            "DEBUG", "INFO", "WARN", "ERROR", "FATAL", "HEADER"};
         const char *level_name = (log_level < rocksdb::NUM_INFO_LOG_LEVELS)
-                                     ? kLevelNames[log_level]
-                                     : "UNKNOWN";
+            ? kLevelNames[log_level]
+            : "UNKNOWN";
         std::fprintf(stderr, "[rocksdb/%s] ", level_name);
         std::vfprintf(stderr, format, ap);
         std::fprintf(stderr, "\n");

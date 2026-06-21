@@ -192,7 +192,7 @@ TEST_F(BlueFSTest, SharedAllocator) {
 
     BlueFS fs(cfg);
     ASSERT_NO_FATAL_FAILURE(fs.add_block_device(BlueFS::BDEV_DB, tmp_path_,
-                                                 false, 0, &ctx));
+                                                false, 0, &ctx));
 
     // After add_block_device with shared_alloc, the allocator slot should be
     // the shared allocator, not a new one
@@ -961,7 +961,7 @@ TEST_F(BlueFSTest, SharedAllocBlueFSUsed) {
     {
         BlueFS fs(cfg);
         ASSERT_NO_FATAL_FAILURE(fs.add_block_device(BlueFS::BDEV_DB, tmp_path_,
-                                                     false, 0, &ctx));
+                                                    false, 0, &ctx));
         ASSERT_EQ(fs.mkfs(cfg.alloc_size), 0);
 
         // mkfs allocates 4MB for the log file via _allocate on the shared
@@ -1650,7 +1650,11 @@ TEST_F(BlueFSTest, CompactMultipleTimes) {
 
 TEST_F(BlueFSTest, CompactPreservesDirsAndFiles) {
     auto cfg = compact_cfg();
-    struct Entry { const char *dir; const char *file; const char *content; };
+    struct Entry {
+        const char *dir;
+        const char *file;
+        const char *content;
+    };
     Entry entries[] = {
         {"dir1", "a", "content-a"},
         {"dir1", "b", "content-b"},
@@ -2078,7 +2082,7 @@ TEST_F(BlueFSTest, DirectWriteAligned) {
     {
         BlueFS fs(cfg);
         ASSERT_NO_FATAL_FAILURE(fs.add_block_device(BlueFS::BDEV_DB,
-                                                     direct_tmpl));
+                                                    direct_tmpl));
         ASSERT_EQ(fs.mkfs(cfg.alloc_size), 0);
         ASSERT_EQ(fs.mount(), 0);
         ASSERT_EQ(fs.mkdir("d"), 0);
@@ -2130,7 +2134,7 @@ TEST_F(BlueFSTest, DirectWriteMultipleBlocks) {
     {
         BlueFS fs(cfg);
         ASSERT_NO_FATAL_FAILURE(fs.add_block_device(BlueFS::BDEV_DB,
-                                                     direct_tmpl));
+                                                    direct_tmpl));
         ASSERT_EQ(fs.mkfs(cfg.alloc_size), 0);
         ASSERT_EQ(fs.mount(), 0);
         ASSERT_EQ(fs.mkdir("d"), 0);
@@ -2579,9 +2583,9 @@ TEST_F(BlueFSTest, ConcurrentWritesToDifferentFiles) {
         threads.emplace_back([&, t]() {
             for (int i = 0; i < kNumWrites; ++i) {
                 std::string fname = "t" + std::to_string(t) + "_f" +
-                                    std::to_string(i);
+                    std::to_string(i);
                 std::string content = "content_" + std::to_string(t) + "_" +
-                                      std::to_string(i);
+                    std::to_string(i);
 
                 BlueFS::FileWriter *w = nullptr;
                 if (fs.open_for_write("d", fname, &w) != 0) {

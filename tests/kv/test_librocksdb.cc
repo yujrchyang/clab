@@ -379,7 +379,7 @@ TEST_F(RocksDBTest, CompactRange) {
     ASSERT_TRUE(db_->Put(rocksdb::WriteOptions(), "b", "2").ok());
 
     auto s = db_->CompactRange(rocksdb::CompactRangeOptions(), nullptr,
-                                nullptr);
+                               nullptr);
     EXPECT_TRUE(s.ok());
 
     std::string val;
@@ -393,7 +393,7 @@ TEST_F(RocksDBTest, CompactAfterDelete) {
     ASSERT_TRUE(db_->Delete(rocksdb::WriteOptions(), "k").ok());
 
     auto s = db_->CompactRange(rocksdb::CompactRangeOptions(), nullptr,
-                                nullptr);
+                               nullptr);
     EXPECT_TRUE(s.ok());
 
     std::string val;

@@ -102,7 +102,7 @@ TEST(ScopeGuardTest, LambdaWithMoveOnlyCapture) {
 }
 
 struct CountingFunctor {
-    int& counter;
+    int &counter;
     void operator()() { ++counter; }
 };
 

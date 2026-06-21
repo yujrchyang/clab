@@ -184,7 +184,7 @@ struct bluefs_fnode_t {
     }
 
     std::vector<bluefs_extent_t>::iterator seek(uint64_t off,
-                                                 uint64_t *x_off);
+                                                uint64_t *x_off);
     bluefs_fnode_delta_t make_delta() const;
 
     DENC_HELPERS

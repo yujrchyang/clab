@@ -76,11 +76,11 @@ Logger &get_default_logger();
 
 // --- Custom logger factories ---
 Logger make_crash_logger(const std::string &log_dir,
-                          const std::string &file_name,
-                          LogLevel level = LogLevel::Trace);
+                         const std::string &file_name,
+                         LogLevel level = LogLevel::Trace);
 Logger make_default_logger(const std::string &log_dir,
-                            const std::string &file_name,
-                            LogLevel level = LogLevel::Info);
+                           const std::string &file_name,
+                           LogLevel level = LogLevel::Info);
 
 }  // namespace TOPNSPC
 

@@ -1,5 +1,5 @@
-#include <pthread.h>
 #include <errno.h>
+#include <pthread.h>
 #include <unistd.h>
 
 #include <chrono>
@@ -143,14 +143,14 @@ Logger &get_default_logger() {
 // ── Custom logger factories ────────────────────────────────────
 
 Logger make_crash_logger(const std::string &log_dir,
-                          const std::string &file_name,
-                          LogLevel level) {
+                         const std::string &file_name,
+                         LogLevel level) {
     return Logger(log_dir, file_name, level);
 }
 
 Logger make_default_logger(const std::string &log_dir,
-                            const std::string &file_name,
-                            LogLevel level) {
+                           const std::string &file_name,
+                           LogLevel level) {
     return Logger(log_dir, file_name, level);
 }
 

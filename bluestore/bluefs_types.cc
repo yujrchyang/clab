@@ -48,7 +48,7 @@ std::vector<bluefs_extent_t>::iterator bluefs_fnode_t::seek(
     if (off >= allocated) return extents.end();
 
     auto it = std::upper_bound(extents_index.begin(), extents_index.end(),
-                                off);
+                               off);
     if (it == extents_index.begin()) return extents.end();
     --it;
 
@@ -71,8 +71,8 @@ bluefs_fnode_delta_t bluefs_fnode_t::make_delta() const {
             continue;
         }
         uint64_t skip = (pos < allocated_committed)
-                            ? (allocated_committed - pos)
-                            : 0;
+            ? (allocated_committed - pos)
+            : 0;
         if (skip == 0) {
             delta.extents.push_back(e);
         } else {
