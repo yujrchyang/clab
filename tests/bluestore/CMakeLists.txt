@@ -38,3 +38,34 @@ target_link_libraries(test_hybrid_allocator
         GTest::gtest_main
 )
 add_test(NAME test_hybrid_allocator COMMAND test_hybrid_allocator)
+
+add_executable(test_bluefs_types test_bluefs_types.cc)
+target_include_directories(test_bluefs_types PRIVATE ${PROJECT_SOURCE_DIR})
+target_link_libraries(test_bluefs_types
+    PRIVATE
+        bluestore
+        clab_test_helpers
+        GTest::gtest_main
+)
+add_test(NAME test_bluefs_types COMMAND test_bluefs_types)
+
+add_executable(test_bluefs_volume_selector test_bluefs_volume_selector.cc)
+target_include_directories(test_bluefs_volume_selector PRIVATE ${PROJECT_SOURCE_DIR})
+target_link_libraries(test_bluefs_volume_selector
+    PRIVATE
+        bluestore
+        clab_test_helpers
+        GTest::gtest_main
+)
+add_test(NAME test_bluefs_volume_selector COMMAND test_bluefs_volume_selector)
+
+add_executable(test_bluefs test_bluefs.cc)
+target_include_directories(test_bluefs PRIVATE ${PROJECT_SOURCE_DIR})
+target_link_libraries(test_bluefs
+    PRIVATE
+        bluestore
+        blk
+        clab_test_helpers
+        GTest::gtest_main
+)
+add_test(NAME test_bluefs COMMAND test_bluefs)

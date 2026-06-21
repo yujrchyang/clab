@@ -7,6 +7,11 @@
 - **LSP:** clangd (`--compile-commands-dir=${workspaceFolder}`)
 - **Compiler artifacts** are gitignored (`.o`, `.so`, `.a`, `build/`, `compile_commands.json`, etc.)
 
+## Development Rules
+
+- **先读 Ceph，再写代码**：每步开发前必须分析 Ceph reference (`/home/yujrchyang/opensrc/ceph/`) 中对应模块的完整实现（.h + .cc），理解完整逻辑、数据结构、边界条件后再开始编码。禁止仅凭设计文档或记忆实现。
+- **新源码文件名必须小写**：所有新增源码文件（`.h`/`.cc`）使用全小写字母命名（如 `bluefs.h`/`bluefs.cc`），禁止大写字母。
+
 ## Headers
 
 `IncludeBlocks: Preserve` — clang-format preserves user-defined groups
@@ -115,6 +120,25 @@ decode(e, bl.cbegin());   // denc(o, p) 顶层包装
   - `HybridAllocator`: wraps AvlAllocator + BitmapAllocator child, `_add_to_tree()` override to claim-free adjacent extents from bitmap before AVL insert
    - `Allocator::create()` factory with `"stupid"` (AvlAllocator), `"bitmap"`, `"hybrid"` type strings
 - **Tests:** 21 AvlAllocator tests, 33 BitmapAllocator tests, 19 HybridAllocator tests — all pass
+- **BlueFS Phase 1.1–1.9 (data structures through space allocation):** 33 tests total
+  - `bluefs_types.h`: `bluefs_super_t`, `bluefs_fnode_t`, `bluefs_transaction_t`, `bluefs_extent_t` with DENC serialization
+  - `BlueFSConfig` struct + `RocksDBBlueFSVolumeSelector` (WAL→DB→slow device fallback)
+  - KernelDevice as block device backend with buffered IO support
+  - Superblock layout (pad to 4KB at offset 0): `_write_super`/`_read_super` with CRC-32C
+  - mkfs: allocate log file (4096 extents), write superblock
+  - mount: read super, replay log (dirs + files), init allocators with `init_rm_free` for existing extents
+  - umount: persist log metadata to superblock, flush + truncate log
+  - Log replay: full `bluefs_transaction_t` with `op_bl` operations
+  - Directory ops: `mkdir`, `rmdir`, `exists`, `readdir` with persistence
+  - File ops: `open_for_read`, `open_for_write` (with/without truncate), `close_writer`/`close_reader`
+  - `_flush_F`/`_flush_range_F`/`_flush_data`: buffer → extent-mapped data on block device
+  - `_allocate`: AvlAllocator-based extent allocation per bdev
+  - `_flush_and_sync_log`: dirty tracking, transaction encoding, log rotation
+  - `read`, `read_random`: extent-based read with `preadv` via KernelDevice
+  - `fsync`: `_flush_F(force=true)` + `_flush_and_sync_log`
+  - Fixes: KernelDevice buffered IO alignment skip, `close_writer` double-flush, `umount` log metadata loss, `pending_release` vector resize, `_flush_F` buffer clear, fsync deadlock (release dirty lock before log sync)
+  - **Code review fixes (Phase 1.11 completion):** `lock_file`/`unlock_file`/`invalidate_cache`/`flush_range`/`preallocate`/`get_used` all implemented; `OP_DIR_UNLINK` replay assertion (refs>0); `OP_FILE_UPDATE_INC` delta offset validation; truncate uses `op_file_update` instead of `op_file_update_inc`; `_flush_data` reverted to direct buffer write
+  - 55 tests total, all pass
 
 ### Key Decisions
 - Single default ColumnFamily (no hash sharding, no `parse_sharding_def`)
@@ -130,25 +154,33 @@ decode(e, bl.cbegin());   // denc(o, p) 顶层包装
 - Allocator::create() type string `"stupid"` maps to AvlAllocator (not the original Ceph StupidAllocator)
 - HybridAllocator allocation strategy: always try AVL first, bitmap as fallback (simplified from Ceph's conditional strategy)
 - `_add_to_tree()` claim-free optimization reclaims adjacent free extents from bitmap child before AVL insertion
+- BlueFS uses AvlAllocator (`"avl"` type) instead of BitmapAllocator — BitmapAllocator's 512MB L2 granularity is too coarse for small test devices (8MB), causing `init_rm_free` on any range within the first 512MB to clear the entire L2 bit
+- `_flush_F` clears `h->buffer` after successful flush to prevent double-flush on `close_writer` calling `_flush_F` then `_flush_bdev`
+- `close_writer` calls `_flush_F(h, true)` before `_flush_bdev()` then `_close_writer()` — ensures data flushed before writer destroyed
+- `umount` saves `super_.log_fnode` and calls `_write_super()` before clearing `nodes_.file_map` — otherwise next mount gets stale log extents
+- `fsync` lock ordering: release `dirty_.lock` before calling `_flush_and_sync_log` (which internally acquires both `log_.lock` and `dirty_.lock`)
+- `dirty_.pending_release` vector resized to `MAX_BDEV` in `_init_alloc` (accessed as `pending_release[e.bdev]`); `_flush_and_sync_log` processes in-place instead of swap-and-discard to preserve vector size
+- KernelDevice `write`/`read`: skip `is_valid_io` alignment check for buffered IO (kernel page cache handles misalignment)
+- Allocator::create() type `"stupid"` maps to AvlAllocator
 
 ### Development Plan (3 phases, bottom-up)
 
 开发顺序 **BlueFS → BlueRocksEnv → BlueStore**，详见 `docs/plan.md`。
 
 #### Phase 1: BlueFS (11 steps)
-| # | Step | Test Strategy |
-|---|------|---------------|
-| 1.1 | `bluefs_types` — 数据结构 + DENC | encode/decode roundtrip |
-| 1.2 | BlueFSConfig + RocksDBBlueFSVolumeSelector | 逻辑测试，无 IO |
-| 1.3 | 设备层 + 超级块 (add_block_device, _write_super) | tempfile 读写 |
-| 1.4 | mkfs + mount + 日志重放 | mkfs→mount→umount 循环 |
-| 1.5 | 目录操作 (mkdir, rmdir, lookup) | 创建/列出/删除 |
-| 1.6 | 文件创建/关闭 (open_for_write/read, close_writer/reader) | 文件生命周期 |
-| 1.7 | 文件读写 (append_try_flush, read, read_random, fsync) | 写入→读回验证 |
-| 1.8 | 日志持久化 (dirty tracking, flush_and_sync_log) | 写→umount→mount→验证 |
-| 1.9 | 空间分配 (_allocate, 设备回退, shared_alloc) | 多设备分配 |
-| 1.10 | 异步压缩 (_compact_log_async) | 增长→压缩→验证 |
-| 1.11 | 文件管理 (truncate, unlink, rename, stat) + 边界 | 错误路径 |
+| # | Step | Test Strategy | Status |
+|---|------|---------------|--------|
+| 1.1 | `bluefs_types` — 数据结构 + DENC | encode/decode roundtrip | ✅ |
+| 1.2 | BlueFSConfig + RocksDBBlueFSVolumeSelector | 逻辑测试，无 IO | ✅ |
+| 1.3 | 设备层 + 超级块 (add_block_device, _write_super) | tempfile 读写 | ✅ |
+| 1.4 | mkfs + mount + 日志重放 | mkfs→mount→umount 循环 | ✅ |
+| 1.5 | 目录操作 (mkdir, rmdir, lookup) | 创建/列出/删除 | ✅ |
+| 1.6 | 文件创建/关闭 (open_for_write/read, close_writer/reader) | 文件生命周期 | ✅ |
+| 1.7 | 文件读写 (append_try_flush, read, read_random, fsync) | 写入→读回验证 | ✅ |
+| 1.8 | 日志持久化 (dirty tracking, flush_and_sync_log) | 写→umount→mount→验证 | ✅ |
+| 1.9 | 空间分配 (_allocate, 设备回退, shared_alloc) | 多设备分配 | ✅ |
+| 1.10 | 异步压缩 (_compact_log_async) | 增长→压缩→验证 | ✅ |
+| 1.11 | 文件管理 (truncate, unlink, rename, stat) + 边界 | 错误路径 | ✅ |
 
 #### Phase 2: BlueRocksEnv (7 steps)
 | # | Step | Test Strategy |
@@ -181,7 +213,8 @@ decode(e, bl.cbegin());   // denc(o, p) 顶层包装
 | 3.15 | 集成测试 | 压力 + 持久化 + 边界 |
 
 ### Next Steps
-开发已进入设计收尾阶段。下一步：按 `docs/plan.md` 开始实现 **Phase 1: BlueFS**。
+1. Phase 2.1: BlueRocksEnv 辅助函数 (err_to_status, split)
+2. Phase 2.2: BlueRocksSequentialFile + NewSequentialFile
 
 ### Relevant Files
 - `kv/key_value_db.h`: Abstract base (TransactionImpl, IteratorImpl, WholeSpaceIteratorImpl, PrefixIteratorImpl, KeyValueDB)

@@ -144,7 +144,7 @@ void KernelDevice::close() {
 // ---------------------------------------------------------------------------
 int KernelDevice::read(uint64_t off, uint64_t len, bufferlist *pbl,
                        IOContext *ioc, bool buffered) {
-    if (!is_valid_io(off, len))
+    if (!buffered && !is_valid_io(off, len))
         return -EINVAL;
 
     int fd = buffered ? fd_buffered_ : fd_direct_;
@@ -177,7 +177,7 @@ int KernelDevice::read_random(uint64_t off, uint64_t len, char *buf,
 
 int KernelDevice::write(uint64_t off, bufferlist &bl, bool buffered,
                         int write_hint) {
-    if (!is_valid_io(off, bl.length()))
+    if (!buffered && !is_valid_io(off, bl.length()))
         return -EINVAL;
 
     int fd = buffered ? fd_buffered_ : fd_direct_;

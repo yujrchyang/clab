@@ -28,7 +28,7 @@ void Allocator::release(const PExtentVector &release_vec) {
 
 Allocator *Allocator::create(const std::string &type, int64_t size,
                              int64_t block_size, std::string_view name) {
-    if (type == "avl") {
+    if (type == "avl" || type == "stupid") {
         return new AvlAllocator(size, block_size, name);
     }
     if (type == "bitmap") {

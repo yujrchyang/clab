@@ -163,3 +163,12 @@ target_link_libraries(test_formatter
         GTest::gtest_main
 )
 add_test(NAME test_formatter COMMAND test_formatter)
+
+add_executable(test_uuid test_uuid.cc)
+target_include_directories(test_uuid PRIVATE ${PROJECT_SOURCE_DIR})
+target_link_libraries(test_uuid
+    PRIVATE
+        common
+        GTest::gtest_main
+)
+add_test(NAME test_uuid COMMAND test_uuid)

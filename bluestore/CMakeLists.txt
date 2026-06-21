@@ -5,6 +5,10 @@ add_library(bluestore STATIC
     hybrid_allocator.cc
     freelist_manager.cc
     bitmap_freelist_manager.cc
+    bluefs.cc
+    bluefs_config.cc
+    bluefs_types.cc
+    bluefs_volume_selector.cc
 )
 target_include_directories(bluestore PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}

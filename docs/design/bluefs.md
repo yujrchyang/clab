@@ -118,7 +118,7 @@ struct bluefs_super_t {
 };
 ```
 
-序列化时带有 CRC32 校验。
+> **TBD**: CRC32 校验将在超级块写入路径（Phase 1.3）中添加。
 
 #### 2.2.2 物理 extent (`bluefs_extent_t`)
 
@@ -172,7 +172,8 @@ struct bluefs_transaction_t {
     uint64_t seq;              // 单调递增序列号
     bufferlist op_bl;          // 编码后的操作列表
 
-    enum op_t {
+    enum op_t : uint8_t {
+        OP_NONE          = 0,
         OP_INIT          = 2,  // 初始（空文件系统）标记
         OP_DIR_LINK      = 5,  // 设置目录条目
         OP_DIR_UNLINK    = 6,  // 删除目录条目
@@ -181,12 +182,13 @@ struct bluefs_transaction_t {
         OP_FILE_UPDATE   = 9,  // 完整 fnode 更新
         OP_FILE_REMOVE   = 10, // 删除文件
         OP_JUMP          = 11, // 跳转 seq + offset（日志压缩用）
+        OP_JUMP_SEQ      = 12, // 仅跳转 seq（异步压缩用）
         OP_FILE_UPDATE_INC = 13, // 增量 fnode 更新
     };
 };
 ```
 
-每个事务编码后包含 CRC32，填充到块边界对齐。
+> **TBD**: CRC32 校验和块边界对齐将在日志写入路径（Phase 1.8）中添加。
 
 > **clab 简化**: 移除 `OP_ALLOC_ADD`/`OP_ALLOC_RM`（已废弃的历史操作）。
 
@@ -566,8 +568,8 @@ mount()
   │
   ├── 2. 读取超级块
   │     read(BDEV_DB, 4096, 4096 → super_bl)
-  │     decode + verify CRC32
-  │     super = decoded
+  │     decode super
+  │     // TBD: CRC32 校验
   │
   ├── 3. 初始化分配器
   │     for each device:
@@ -582,7 +584,8 @@ mount()
   │     log_fnode = super.log_fnode
   │     for each extent in log_fnode.extents:
   │       for each transaction block:
-  │         read block → verify CRC → decode OPs
+  │         read block → decode OPs
+  │         // TBD: CRC32 校验
   │         switch op:
   │           OP_DIR_CREATE:  nodes_.dir_map[name] = new Dir
   │           OP_DIR_LINK:    dir->file_map[name] = file
