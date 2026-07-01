@@ -22,7 +22,7 @@ unnecessary complexity and concentrating the necessary kind where it can be mana
 | Information hiding | I/O path knows nothing about tier location, scoring, or migration state. Migration protocol hidden behind `ExtentMap::try_relocate()` atomic CAS. |
 | No temporal decomposition | Milestones defined by interface boundaries (I/O path, control path, persistence, integration), not build order |
 | Strategic programming | Interfaces designed first; `BlockDevice` and `Allocator` reused; migration protocol hides generation behind `try_relocate()` |
-| "Somewhat general-purpose" | `BlockDevice` reused from `blk/`; `Allocator` reused from `bluestore/`; btier adds only what is tier-specific |
+| "Somewhat general-purpose" | `BlockDevice` and `Allocator` both reused from `blk/`; btier adds only what is tier-specific |
 | Comments as design | Interface comments describe the abstraction, not the implementation |
 
 ### 1.3 Complexity Budget
@@ -64,8 +64,8 @@ The budget is spent on:
 │  └───────────────────────────────┘                                        
 │                                                                          
 │  ┌──────────────────────────────────────────────────┐                    
-│  │  Existing: blk/ (BlockDevice) + bluestore/       │                    
-│  │  (Allocator) + common/ (bufferlist, intarith)    │                    
+│  │  Existing: blk/ (BlockDevice + Allocator) +     │                    
+│  │  common/ (bufferlist, intarith)                  │                    
 │  └──────────────────────────────────────────────────┘                    
 └──────────────────────────────────────────────────────────────────────────┘
 ```
@@ -367,7 +367,7 @@ via atomic operations and CAS-based relocation for migration.
 #include <vector>
 
 #include "btier/extent_types.h"
-#include "bluestore/allocator.h"
+#include "blk/allocator.h"
 
 namespace TOPNSPC::btier {
 
@@ -1238,13 +1238,12 @@ target_include_directories(btier PUBLIC
     ${PROJECT_SOURCE_DIR}
 )
 target_link_libraries(btier PRIVATE
-    blk          # BlockDevice, KernelDevice
-    bluestore    # Allocator, AvlAllocator
+    blk          # BlockDevice, Allocator, KernelDevice
     common       # bufferlist, intarith
 )
 ```
 
-`bluestore` linked as PRIVATE — btier's consumers should not inherit bluestore symbols.
+No `bluestore` dependency — Allocator now lives in `blk/`. Only BlueFS/BlueRocksEnv/FreelistManager remain in `bluestore/`, which btier does not use.
 
 ### 7.3 Root CMakeLists.txt Addition
 
