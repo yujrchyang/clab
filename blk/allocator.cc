@@ -1,10 +1,10 @@
 #include <cerrno>
 #include <limits>
 
-#include "bluestore/allocator.h"
-#include "bluestore/avl_allocator.h"
-#include "bluestore/bitmap_allocator.h"
-#include "bluestore/hybrid_allocator.h"
+#include "blk/allocator.h"
+#include "blk/avl_allocator.h"
+#include "blk/bitmap_allocator.h"
+#include "blk/hybrid_allocator.h"
 #include "common/intarith.h"
 
 namespace TOPNSPC {

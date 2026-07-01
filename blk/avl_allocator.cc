@@ -2,7 +2,7 @@
 #include <cerrno>
 #include <limits>
 
-#include "bluestore/avl_allocator.h"
+#include "blk/avl_allocator.h"
 #include "common/cassert.h"
 #include "common/intarith.h"
 
@@ -316,7 +316,7 @@ int64_t AvlAllocator::allocate(uint64_t want, uint64_t unit,
     if (max_alloc_size == 0)
         max_alloc_size = want;
 
-    constexpr auto cap = std::numeric_limits<decltype(bluestore_pextent_t::length)>::max();
+    constexpr auto cap = std::numeric_limits<decltype(pextent_t::length)>::max();
     if (max_alloc_size >= cap)
         max_alloc_size = p2align(uint64_t(cap), uint64_t(block_size_));
 

@@ -5,7 +5,7 @@
 #include <string>
 #include <string_view>
 
-#include "bluestore/bluestore_types.h"
+#include "blk/extent_types.h"
 
 namespace TOPNSPC {
 

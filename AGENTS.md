@@ -175,6 +175,7 @@ decode(e, bl.cbegin());   // denc(o, p) 顶层包装
 - `dirty_.pending_release` vector resized to `MAX_BDEV` in `_init_alloc` (accessed as `pending_release[e.bdev]`); `_flush_and_sync_log` processes in-place instead of swap-and-discard to preserve vector size
 - KernelDevice `write`/`read`: skip `is_valid_io` alignment check for buffered IO (kernel page cache handles misalignment)
 - Allocator::create() type `"stupid"` maps to AvlAllocator
+- **Allocator extracted from `bluestore/` to `blk/`** (Phase 0 refactoring): Allocator is pure memory management with no dependency on RocksDB or FreelistManager. `common/extent_types.h` created with `pextent_t`, `PExtentVector`, `interval_set<T>`. `bluestore/bluestore_types.h` now a thin wrapper. Allocator tests moved to `tests/blk/`. `bluestore` now links `blk` (PUBLIC).
 
 ### Development Plan (3 phases, bottom-up)
 

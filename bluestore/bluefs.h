@@ -12,7 +12,7 @@
 
 #include "blk/block_device.h"
 #include "blk/io_context.h"
-#include "bluestore/allocator.h"
+#include "blk/allocator.h"
 #include "bluestore/bluefs_config.h"
 #include "bluestore/bluefs_types.h"
 #include "bluestore/bluefs_volume_selector.h"

@@ -2,8 +2,8 @@
 
 #include <memory>
 
-#include "bluestore/avl_allocator.h"
-#include "bluestore/bitmap_allocator.h"
+#include "blk/avl_allocator.h"
+#include "blk/bitmap_allocator.h"
 
 namespace TOPNSPC {
 
@@ -17,6 +17,7 @@ public:
     const char *get_type() const override { return "hybrid"; }
 
     using AvlAllocator::allocate;
+    using AvlAllocator::release;
 
     int64_t allocate(uint64_t want, uint64_t unit,
                      uint64_t max_alloc_size, int64_t hint,

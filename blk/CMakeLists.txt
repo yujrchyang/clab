@@ -1,6 +1,10 @@
 add_library(blk SHARED
     aio.cc
+    allocator.cc
+    avl_allocator.cc
+    bitmap_allocator.cc
     block_device.cc
+    hybrid_allocator.cc
     io_context.cc
     kernel_device.cc
 )

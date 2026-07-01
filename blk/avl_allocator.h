@@ -5,7 +5,7 @@
 
 #include <boost/intrusive/avl_set.hpp>
 
-#include "bluestore/allocator.h"
+#include "blk/allocator.h"
 
 namespace TOPNSPC {
 
@@ -76,6 +76,7 @@ public:
     const char *get_type() const override { return "avl"; }
 
     using Allocator::allocate;
+    using Allocator::release;
 
     int64_t allocate(uint64_t want, uint64_t unit,
                      uint64_t max_alloc_size, int64_t hint,

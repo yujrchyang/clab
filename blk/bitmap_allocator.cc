@@ -1,4 +1,4 @@
-#include "bluestore/bitmap_allocator.h"
+#include "blk/bitmap_allocator.h"
 
 #include <cerrno>
 

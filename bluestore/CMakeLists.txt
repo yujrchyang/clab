@@ -1,8 +1,4 @@
 add_library(bluestore STATIC
-    allocator.cc
-    avl_allocator.cc
-    bitmap_allocator.cc
-    hybrid_allocator.cc
     freelist_manager.cc
     bitmap_freelist_manager.cc
     bluefs.cc
@@ -18,6 +14,7 @@ target_include_directories(bluestore PUBLIC
 target_link_libraries(bluestore PUBLIC
     common
     kv
+    blk
 )
 target_link_libraries(bluestore PUBLIC
     RocksDB::RocksDB

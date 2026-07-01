@@ -9,9 +9,9 @@
 #include <string_view>
 #include <vector>
 
-#include "bluestore/allocator.h"
-#include "bluestore/bluestore_types.h"
+#include "blk/allocator.h"
 #include "common/cassert.h"
+#include "blk/extent_types.h"
 #include "common/intarith.h"
 
 namespace TOPNSPC {
@@ -646,6 +646,7 @@ public:
     const char *get_type() const override { return "bitmap"; }
 
     using Allocator::allocate;
+    using Allocator::release;
 
     int64_t allocate(uint64_t want, uint64_t unit,
                      uint64_t max_alloc_size, int64_t hint,
