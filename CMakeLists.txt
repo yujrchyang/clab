@@ -50,6 +50,9 @@ add_subdirectory(kv)
 # --- BlueStore library ---
 add_subdirectory(bluestore)
 
+# --- BTier tiered storage engine ---
+add_subdirectory(btier)
+
 # --- Examples ---
 if(EXAMPLE)
     add_subdirectory(examples)
