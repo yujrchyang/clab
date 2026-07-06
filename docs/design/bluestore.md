@@ -21,7 +21,7 @@ BlueStore 是一个直接管理原始块设备的单机键值存储引擎，绕�
 
 ### 1.2 依赖组件
 
-| 组件 | 角色 | 对应 clab 实现 |
+| 组件 | 角色 | 对应 cxxlab 实现 |
 | --- | --- | --- |
 | `KeyValueDB` | 元数据持久化 | `kv/rocksdb_store.h` (RocksDBStore) |
 | `FreelistManager` | 分配状态持久化 | `bluestore/bitmap_freelist_manager.h` |
@@ -55,7 +55,7 @@ BlueStore 将不同类型的数据存储在不同的 RocksDB 前缀（Prefix）�
 | `"C"` | `PREFIX_COLL` | Collection (PG) 元数据 | collection name (string) | `bluestore_cnode_t` |
 | `"O"` | `PREFIX_OBJ` | Object onode + extent shard | 编码的 `ghobject_t` + suffix | `bluestore_onode_t` / shard |
 | `"L"` | `PREFIX_DEFERRED` | 延迟写入 WAL | `u64 seq` | `bluestore_deferred_transaction_t` |
-> **clab 简化**: omap 相关前缀（`PREFIX_OMAP`、`PREFIX_PGMETA_OMAP`、`PREFIX_PERPOOL_OMAP`、`PREFIX_PERPG_OMAP`）暂不实现。
+> **cxxlab 简化**: omap 相关前缀（`PREFIX_OMAP`、`PREFIX_PGMETA_OMAP`、`PREFIX_PERPOOL_OMAP`、`PREFIX_PERPG_OMAP`）暂不实现。
 
 ### 2.2 Object Key 编码
 
@@ -150,7 +150,7 @@ struct bluestore_pextent_t {
 using PExtentVector = std::vector<bluestore_pextent_t>;
 ```
 
-> **clab 简化**: 仅保留 offset + length，不做 denc\_lba/denc\_varint\_lowz 变长编码压缩。
+> **cxxlab 简化**: 仅保留 offset + length，不做 denc\_lba/denc\_varint\_lowz 变长编码压缩。
 
 ### 3.4 bluestore_blob_t
 
@@ -186,7 +186,7 @@ struct bluestore_blob_t {
 };
 ```
 
-> **clab 简化**: 移除压缩相关 flag (`FLAG_COMPRESSED`) 和 unused 位图 (`FLAG_HAS_UNUSED` 保留但不实现 unused 追踪)，移除 shared blob flag (`FLAG_SHARED`)。
+> **cxxlab 简化**: 移除压缩相关 flag (`FLAG_COMPRESSED`) 和 unused 位图 (`FLAG_HAS_UNUSED` 保留但不实现 unused 追踪)，移除 shared blob flag (`FLAG_SHARED`)。
 
 ### 3.5 bluestore_onode_t
 
@@ -292,7 +292,7 @@ class Blob {
 };
 ```
 
-> **clab 简化**: Blob 不关联 SharedBlob，生命周期完全由拥有它的 Collection 管理。`used_in_blob` 使用 `bluestore_blob_use_tracker_t` 追踪哪些 AU 已被写入，用于 `release_extents()` 判断哪些物理 extent 可归还。
+> **cxxlab 简化**: Blob 不关联 SharedBlob，生命周期完全由拥有它的 Collection 管理。`used_in_blob` 使用 `bluestore_blob_use_tracker_t` 追踪哪些 AU 已被写入，用于 `release_extents()` 判断哪些物理 extent 可归还。
 
 ### 3.9 Collection
 
@@ -342,7 +342,7 @@ class TransContext {
 };
 ```
 
-> **clab 简化**: 移除 statfs delta、BlueStoreThrottle。不实现 deferred write（初始版本全部使用同步 AIO 路径）。
+> **cxxlab 简化**: 移除 statfs delta、BlueStoreThrottle。不实现 deferred write（初始版本全部使用同步 AIO 路径）。
 
 ---
 
@@ -443,7 +443,7 @@ void _kv_sync_thread();
 void _kv_finalize_thread();
 ```
 
-> **clab 简化**: 使用单线程模型，kv_sync_thread 和 kv_finalize_thread 各一个线程。移除 BlueStoreThrottle 和复杂的并发控制。
+> **cxxlab 简化**: 使用单线程模型，kv_sync_thread 和 kv_finalize_thread 各一个线程。移除 BlueStoreThrottle 和复杂的并发控制。
 
 ---
 
@@ -775,7 +775,7 @@ _txc_release_alloc(txc):
                                                     STATE_DONE
 ```
 
-> **clab 简化**: 不实现 deferred write 路径。所有写入在 AIO 完成后立即通过 KV 事务持久化，不走 WAL 延迟提交。
+> **cxxlab 简化**: 不实现 deferred write 路径。所有写入在 AIO 完成后立即通过 KV 事务持久化，不走 WAL 延迟提交。
 
 ### 6.3 OpSequencer 顺序保证
 
@@ -832,7 +832,7 @@ mount()
 
 ### 8.1 与 Ceph 的差异汇总
 
-| 特性 | Ceph BlueStore | clab |
+| 特性 | Ceph BlueStore | cxxlab |
 | --- | --- | --- |
 | 压缩 | 支持 (zlib/zstd/lz4/snappy) | **暂不实现** |
 | Shared Blob | 支持克隆引用计数 | 不实现（无 clone/snapshot） |

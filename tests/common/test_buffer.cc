@@ -5,7 +5,7 @@
 
 #include "common/buffer.h"
 
-using namespace clab;
+using namespace TOPNSPC;
 
 TEST(TestBufferPtr, DefaultConstructor) {
     buffer::ptr bp;

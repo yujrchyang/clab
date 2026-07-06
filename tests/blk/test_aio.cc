@@ -8,7 +8,7 @@
 #include <vector>
 
 #include "blk/aio.h"
-#include "clab_test.h"
+#include "cxxlab_test.h"
 
 using namespace TOPNSPC;
 
@@ -17,7 +17,7 @@ protected:
     int fd_ = -1;
 
     void SetUp() override {
-        auto tmpl = clab_tmp_path("aio");
+        auto tmpl = cxxlab_tmp_path("aio");
         fd_ = mkstemp(tmpl.data());
         ASSERT_GE(fd_, 0) << "mkstemp failed";
         ASSERT_EQ(0, unlink(tmpl.c_str()));

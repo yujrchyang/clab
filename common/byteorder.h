@@ -11,45 +11,45 @@ inline T swab(T val) {
 }
 
 template <typename T>
-struct clab_le {
+struct cxxlab_le {
 private:
     T v;
 
 public:
-    clab_le() = default;
-    explicit clab_le(T nv)
+    cxxlab_le() = default;
+    explicit cxxlab_le(T nv)
         : v{boost::endian::native_to_little(nv)} {}
-    clab_le<T> &operator=(T nv) {
+    cxxlab_le<T> &operator=(T nv) {
         v = boost::endian::native_to_little(nv);
         return *this;
     }
     operator T() const { return boost::endian::little_to_native(v); }
     // compares little-endian byte storage directly (equivalent to decoded comparison)
-    friend inline bool operator==(clab_le a, clab_le b) {
+    friend inline bool operator==(cxxlab_le a, cxxlab_le b) {
         return a.v == b.v;
     }
 } __attribute__((packed));
 
-using clab_le64 = clab_le<__u64>;
-using clab_le32 = clab_le<__u32>;
-using clab_le16 = clab_le<__u16>;
+using cxxlab_le64 = cxxlab_le<__u64>;
+using cxxlab_le32 = cxxlab_le<__u32>;
+using cxxlab_le16 = cxxlab_le<__u16>;
 
-using clab_les64 = clab_le<__s64>;
-using clab_les32 = clab_le<__s32>;
-using clab_les16 = clab_le<__s16>;
+using cxxlab_les64 = cxxlab_le<__s64>;
+using cxxlab_les32 = cxxlab_le<__s32>;
+using cxxlab_les16 = cxxlab_le<__s16>;
 
-inline clab_les64 init_les64(__s64 x) {
-    clab_les64 v;
+inline cxxlab_les64 init_les64(__s64 x) {
+    cxxlab_les64 v;
     v = x;
     return v;
 }
-inline clab_les32 init_les32(__s32 x) {
-    clab_les32 v;
+inline cxxlab_les32 init_les32(__s32 x) {
+    cxxlab_les32 v;
     v = x;
     return v;
 }
-inline clab_les16 init_les16(__s16 x) {
-    clab_les16 v;
+inline cxxlab_les16 init_les16(__s16 x) {
+    cxxlab_les16 v;
     v = x;
     return v;
 }

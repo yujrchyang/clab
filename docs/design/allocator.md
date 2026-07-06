@@ -352,13 +352,13 @@ void HybridAllocator::_add_to_tree(uint64_t start, uint64_t size) {
 | BlueStore 写路径 | 始终传 0 | `_do_alloc_write()` 中 `hint = 0` |
 | BlueFS | 传末 extent 结尾 | 鼓励连续分配 |
 
-**clab 决策**: 由于 BlueStore 写路径始终传 0，AvlAllocator 也忽略 hint，移植时 BitmapAllocator 可以保留 hint 逻辑但非必须。
+**cxxlab 决策**: 由于 BlueStore 写路径始终传 0，AvlAllocator 也忽略 hint，移植时 BitmapAllocator 可以保留 hint 逻辑但非必须。
 
 ## 3. 接口设计
 
 ### 3.1 Allocator 基类
 
-所有模块均位于 `TOPNSPC`（即 `clab`）命名空间下。
+所有模块均位于 `TOPNSPC`（即 `cxxlab`）命名空间下。
 
 ```cpp
 class Allocator {
@@ -416,7 +416,7 @@ protected:
 
 ### 3.2 PExtentVector（物理 extent 容器）
 
-沿用已有 `bluestore_types.h` 中的定义（或 clab 的等价类型）：
+沿用已有 `bluestore_types.h` 中的定义（或 cxxlab 的等价类型）：
 
 ```cpp
 struct bluestore_pextent_t {
@@ -429,7 +429,7 @@ using PExtentVector = std::vector<bluestore_pextent_t>;
 
 ### 3.3 interval_set（区间容器）
 
-用于 release 接口。Ceph 使用 `interval_set<uint64_t>`，clab 可复用已有的 `interval_set` 或 `std::map<uint64_t, uint64_t>`。
+用于 release 接口。Ceph 使用 `interval_set<uint64_t>`，cxxlab 可复用已有的 `interval_set` 或 `std::map<uint64_t, uint64_t>`。
 
 ## 4. 关键流程
 
@@ -497,12 +497,12 @@ close():
 
 ### 5.2 简化项
 
-| Ceph 实现 | clab 简化策略 |
+| Ceph 实现 | cxxlab 简化策略 |
 | --- | --- |
 | `AdminSocketHook` debug 接口 | 移除（ASok 调试钩子，非核心） |
 | `mempool` 内存监控 | 移除（仅统计用途） |
 | `cct->_conf` 配置读取 | 改用构造函数参数或全局配置结构体 |
-| `bluestore_types.h` 中 `bluestore_pextent_t` | clab 中定义等价类型 |
+| `bluestore_types.h` 中 `bluestore_pextent_t` | cxxlab 中定义等价类型 |
 | ZonedAllocator / StupidAllocator | 不做移植 |
 | `_fragment_and_emplace` 中的 max_length 切片 | 保留（避免单 extent 过大） |
 | `get_fragmentation_score` 算法 | 保留基础实现，移除 clz 等平台相关问题（可用 `__builtin_clzll`） |
@@ -521,7 +521,7 @@ close():
 
 Allocator 依赖：
 
-- `common` 库: `bufferlist`、`clab_assert`、`interval_set`、`intarith` 工具函数
+- `common` 库: `bufferlist`、`cxxlab_assert`、`interval_set`、`intarith` 工具函数
 - 无 `kv` / `rocksdb` 依赖（只操作内存）
 - 无 `blk` 依赖
 

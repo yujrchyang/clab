@@ -178,7 +178,7 @@ struct denc_traits<
     T,
     std::enable_if_t<
         _denc::is_any_of<_denc::underlying_type_t<T>,
-                         clab_le64, clab_le32, clab_le16, uint8_t,
+                         cxxlab_le64, cxxlab_le32, cxxlab_le16, uint8_t,
                          int8_t>>> {
     static constexpr bool supported = true;
     static constexpr bool featured = false;
@@ -214,17 +214,17 @@ struct ExtType {
 
 template <typename T>
 struct ExtType<T, std::enable_if_t<std::is_same_v<T, int16_t> || std::is_same_v<T, uint16_t>>> {
-    using type = clab_le16;
+    using type = cxxlab_le16;
 };
 
 template <typename T>
 struct ExtType<T, std::enable_if_t<std::is_same_v<T, int32_t> || std::is_same_v<T, uint32_t>>> {
-    using type = clab_le32;
+    using type = cxxlab_le32;
 };
 
 template <typename T>
 struct ExtType<T, std::enable_if_t<std::is_same_v<T, int64_t> || std::is_same_v<T, uint64_t>>> {
-    using type = clab_le64;
+    using type = cxxlab_le64;
 };
 
 template <>
@@ -436,11 +436,11 @@ denc_lba(uint64_t v, It &p) {
     word |= (v << pos) & 0x7fffffff;
     v >>= 31 - pos;
     if (!v) {
-        *(clab_le32 *)p.get_pos_add(sizeof(uint32_t)) = word;
+        *(cxxlab_le32 *)p.get_pos_add(sizeof(uint32_t)) = word;
         return;
     }
     word |= 0x80000000;
-    *(clab_le32 *)p.get_pos_add(sizeof(uint32_t)) = word;
+    *(cxxlab_le32 *)p.get_pos_add(sizeof(uint32_t)) = word;
     uint8_t byte = v & 0x7f;
     v >>= 7;
     while (v) {
@@ -455,7 +455,7 @@ denc_lba(uint64_t v, It &p) {
 template <class It>
 inline std::enable_if_t<is_const_iterator_v<It>>
 denc_lba(uint64_t &v, It &p) {
-    uint32_t word = *(clab_le32 *)p.get_pos_add(sizeof(uint32_t));
+    uint32_t word = *(cxxlab_le32 *)p.get_pos_add(sizeof(uint32_t));
     int shift = 0;
     switch (word & 7) {
     case 0:
@@ -1639,7 +1639,7 @@ inline std::enable_if_t<traits::supported && !traits::featured> decode_nohead(
                              __u8 *struct_compat,                  \
                              char **len_pos,                       \
                              uint32_t *start_oob_off) {            \
-        *(clab_le32 *)*len_pos =                                   \
+        *(cxxlab_le32 *)*len_pos =                                 \
             p.get_pos() - *len_pos - sizeof(uint32_t) +            \
             p.get_out_of_band_offset() - *start_oob_off;           \
     }                                                              \

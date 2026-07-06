@@ -11,8 +11,8 @@
 #include <string>
 #include <vector>
 
-#include "clab_test.h"
 #include "common/buffer.h"
+#include "cxxlab_test.h"
 #include "kv/key_value_db.h"
 #include "kv/merge_op/int64_array_merge_op.h"
 #include "kv/merge_op/xor_merge_op.h"
@@ -22,7 +22,7 @@ using namespace TOPNSPC;
 namespace {
 
 static std::string tmpdir() {
-    auto tmpl = clab_tmp_dir("rocksdb");
+    auto tmpl = cxxlab_tmp_dir("rocksdb");
     char *buf = tmpl.data();
     if (!mkdtemp(buf))
         return {};

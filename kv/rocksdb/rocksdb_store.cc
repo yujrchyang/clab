@@ -36,7 +36,7 @@ public:
             ops)
         : merge_ops_(std::move(ops)) {}
 
-    const char *Name() const override { return "clab_kv_merge_adapter"; }
+    const char *Name() const override { return "cxxlab_kv_merge_adapter"; }
 
     bool FullMergeV2(const MergeOperationInput &merge_in,
                      MergeOperationOutput *merge_out) const override {

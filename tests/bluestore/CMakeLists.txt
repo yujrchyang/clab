@@ -4,7 +4,7 @@ target_link_libraries(test_bitmap_freelist_manager
     PRIVATE
         bluestore
         kv
-        clab_test_helpers
+        cxxlab_test_helpers
         GTest::gtest_main
 )
 add_test(NAME test_bitmap_freelist_manager COMMAND test_bitmap_freelist_manager)
@@ -14,7 +14,7 @@ target_include_directories(test_bluefs_types PRIVATE ${PROJECT_SOURCE_DIR})
 target_link_libraries(test_bluefs_types
     PRIVATE
         bluestore
-        clab_test_helpers
+        cxxlab_test_helpers
         GTest::gtest_main
 )
 add_test(NAME test_bluefs_types COMMAND test_bluefs_types)
@@ -24,7 +24,7 @@ target_include_directories(test_bluefs_volume_selector PRIVATE ${PROJECT_SOURCE_
 target_link_libraries(test_bluefs_volume_selector
     PRIVATE
         bluestore
-        clab_test_helpers
+        cxxlab_test_helpers
         GTest::gtest_main
 )
 add_test(NAME test_bluefs_volume_selector COMMAND test_bluefs_volume_selector)
@@ -35,7 +35,7 @@ target_link_libraries(test_bluefs
     PRIVATE
         bluestore
         blk
-        clab_test_helpers
+        cxxlab_test_helpers
         GTest::gtest_main
 )
 add_test(NAME test_bluefs COMMAND test_bluefs)
@@ -46,7 +46,7 @@ target_link_libraries(test_blue_rocks_env
     PRIVATE
         bluestore
         blk
-        clab_test_helpers
+        cxxlab_test_helpers
         GTest::gtest_main
 )
 add_test(NAME test_blue_rocks_env COMMAND test_blue_rocks_env)

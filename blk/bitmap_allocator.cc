@@ -17,9 +17,9 @@ BitmapAllocator::BitmapAllocator(int64_t capacity, int64_t alloc_unit,
 int64_t BitmapAllocator::allocate(uint64_t want, uint64_t unit,
                                   uint64_t max_alloc_size, int64_t hint,
                                   PExtentVector *extents) {
-    clab_assert(isp2(unit));
-    clab_assert(want % unit == 0);
-    clab_assert(unit >= l1.l0_granularity);
+    cxxlab_assert(isp2(unit));
+    cxxlab_assert(want % unit == 0);
+    cxxlab_assert(unit >= l1.l0_granularity);
     uint64_t allocated = 0;
     int r = _allocate_l2(want, unit, max_alloc_size, hint,
                          &allocated, extents);
@@ -194,7 +194,7 @@ template <typename L1>
 uint64_t AllocatorLevel02<L1>::claim_free_to_left(uint64_t offset) {
     std::lock_guard l(lock);
     auto allocated = l1.claim_free_to_left_l1(offset);
-    clab_assert(available >= allocated);
+    cxxlab_assert(available >= allocated);
     available -= allocated;
 
     uint64_t l2_pos = (offset - allocated) / l2_granularity;
@@ -208,7 +208,7 @@ template <typename L1>
 uint64_t AllocatorLevel02<L1>::claim_free_to_right(uint64_t offset) {
     std::lock_guard l(lock);
     auto allocated = l1.claim_free_to_right_l1(offset);
-    clab_assert(available >= allocated);
+    cxxlab_assert(available >= allocated);
     available -= allocated;
 
     uint64_t l2_pos = offset / l2_granularity;

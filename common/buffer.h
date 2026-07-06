@@ -207,11 +207,11 @@ public:
     bool is_zero() const;
 
     void set_offset(unsigned o) {
-        clab_assert(raw_length() >= o);
+        cxxlab_assert(raw_length() >= o);
         _off = o;
     }
     void set_length(unsigned l) {
-        clab_assert(raw_length() >= l);
+        cxxlab_assert(raw_length() >= l);
         _len = l;
     }
 
@@ -987,7 +987,7 @@ public:
     int send_fd(int fd) const;
     template <typename VectorT>
     void prepare_iov(VectorT *piov) const {
-        clab_assert(_num <= IOV_MAX);
+        cxxlab_assert(_num <= IOV_MAX);
         piov->resize(_num);
         unsigned n = 0;
         for (auto &p : _buffers) {

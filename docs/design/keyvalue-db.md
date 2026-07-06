@@ -4,7 +4,7 @@
 
 ### 1.1 背景
 
-clab 需要在 block device 层之上实现一个类 BlueStore 的对象存储引擎。Ceph BlueStore 依赖一个 KV 存储作为元数据与状态持久化引擎，承担以下职责：
+cxxlab 需要在 block device 层之上实现一个类 BlueStore 的对象存储引擎。Ceph BlueStore 依赖一个 KV 存储作为元数据与状态持久化引擎，承担以下职责：
 
 | 数据类别 | KV Prefix | 内容 |
 | --- | --- | --- |
@@ -478,7 +478,7 @@ BlueStore::_replay()
 ### 6.1 创建及打开
 
 ```cpp
-auto db = KeyValueDB::create("rocksdb", "/var/lib/clab/store", {});
+auto db = KeyValueDB::create("rocksdb", "/var/lib/cxxlab/store", {});
 // 必须在 open 前注册 MergeOperator
 db->set_merge_operator("T",
     std::make_shared<Int64ArrayMergeOperator>());

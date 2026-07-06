@@ -18,7 +18,7 @@
 #include "blk/block_device.h"
 #include "blk/kernel_device.h"
 #include "bluestore/bluefs.h"
-#include "clab_test.h"
+#include "cxxlab_test.h"
 
 using namespace TOPNSPC;
 
@@ -32,7 +32,7 @@ protected:
     static constexpr uint64_t kFileSize = 8 << 20;
 
     void SetUp() override {
-        auto tmpl = clab_tmp_path("bluefs_test");
+        auto tmpl = cxxlab_tmp_path("bluefs_test");
         tmp_fd_ = ::mkstemp(tmpl.data());
         ASSERT_GE(tmp_fd_, 0);
         tmp_path_ = tmpl;
@@ -879,7 +879,7 @@ TEST_F(BlueFSTest, MultiDeviceFallback) {
     cfg.min_flush_size = 256;  // flush eagerly
 
     // Create a separate temp file for WAL device (64KB)
-    auto wal_tmpl = clab_tmp_path("bluefs_wal");
+    auto wal_tmpl = cxxlab_tmp_path("bluefs_wal");
     int wal_fd = ::mkstemp(wal_tmpl.data());
     ASSERT_GE(wal_fd, 0);
     ::fallocate(wal_fd, 0, 0, 64 << 10);
@@ -2068,7 +2068,7 @@ TEST_F(BlueFSTest, DirectWriteAligned) {
     cfg.buffered_io = false;  // O_DIRECT
 
     // Use a separate temp file with data for direct IO
-    auto direct_tmpl = clab_tmp_path("bluefs_direct");
+    auto direct_tmpl = cxxlab_tmp_path("bluefs_direct");
     int direct_fd = ::mkstemp(direct_tmpl.data());
     ASSERT_GE(direct_fd, 0);
     ::fallocate(direct_fd, 0, 0, kFileSize);
@@ -2120,7 +2120,7 @@ TEST_F(BlueFSTest, DirectWriteMultipleBlocks) {
     cfg.alloc_size = 4096;
     cfg.buffered_io = false;
 
-    auto direct_tmpl = clab_tmp_path("bluefs_direct_multi");
+    auto direct_tmpl = cxxlab_tmp_path("bluefs_direct_multi");
     int direct_fd = ::mkstemp(direct_tmpl.data());
     ASSERT_GE(direct_fd, 0);
     ::fallocate(direct_fd, 0, 0, kFileSize);

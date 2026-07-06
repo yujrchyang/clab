@@ -60,7 +60,7 @@ rocksdb::Status err_to_status(int r) {
     case -ENOLCK:
         return rocksdb::Status::IOError(std::strerror(r));
     default:
-        clab_assert(!"unrecognized error code");
+        cxxlab_assert(!"unrecognized error code");
         return rocksdb::Status::NotSupported(rocksdb::Status::kNone);
     }
 }
@@ -69,7 +69,7 @@ rocksdb::Status err_to_status(int r) {
 std::pair<std::string_view, std::string_view>
 split(const std::string &fn) {
     size_t slash = fn.rfind('/');
-    clab_assert(slash != fn.npos);
+    cxxlab_assert(slash != fn.npos);
     size_t file_begin = slash + 1;
     while (slash && fn[slash - 1] == '/')
         --slash;
@@ -93,7 +93,7 @@ public:
     rocksdb::Status Read(size_t n, rocksdb::Slice *result,
                          char *scratch) override {
         int64_t r = fs_->read(h_, h_->buf.pos, n, nullptr, scratch);
-        clab_assert(r >= 0);
+        cxxlab_assert(r >= 0);
         *result = rocksdb::Slice(scratch, r);
         return rocksdb::Status::OK();
     }
@@ -125,7 +125,7 @@ public:
     rocksdb::Status Read(uint64_t offset, size_t n, rocksdb::Slice *result,
                          char *scratch) const override {
         int64_t r = fs_->read_random(h_, offset, n, scratch);
-        clab_assert(r >= 0);
+        cxxlab_assert(r >= 0);
         *result = rocksdb::Slice(scratch, r);
         return rocksdb::Status::OK();
     }
@@ -438,7 +438,7 @@ rocksdb::Status BlueRocksEnv::RenameFile(
 rocksdb::Status BlueRocksEnv::LinkFile(
     const std::string & /*src*/,
     const std::string & /*target*/) {
-    clab_abort("LinkFile not supported");
+    cxxlab_abort("LinkFile not supported");
 }
 
 rocksdb::Status BlueRocksEnv::AreFilesSame(
@@ -496,7 +496,7 @@ rocksdb::Status BlueRocksEnv::NewLogger(
 }
 
 rocksdb::Status BlueRocksEnv::GetTestDirectory(std::string *path) {
-    *path = "clab_rocksdb_test_dir";
+    *path = "cxxlab_rocksdb_test_dir";
     return rocksdb::Status::OK();
 }
 

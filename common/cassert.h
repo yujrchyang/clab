@@ -78,12 +78,12 @@ void __common_assert_warn(const char *assertion,
                __STRING(expr), __FILE__, __LINE__, \
                __COMMON_ASSERT_FUNCTION, __VA_ARGS__))
 
-// ── Global-namespace aliases with clab_ prefix ──
+// ── Global-namespace aliases with cxxlab_ prefix ──
 
-#define clab_assert(expr) common_assert(expr)
-#define clab_abort(...) common_abort(__VA_ARGS__)
-#define clab_abort_msg(msg) common_abort_msg(msg)
-#define clab_assertf(expr, ...) common_assertf(expr, __VA_ARGS__)
-#define clab_assert_warn(expr) assert_warn(expr)
+#define cxxlab_assert(expr) common_assert(expr)
+#define cxxlab_abort(...) common_abort(__VA_ARGS__)
+#define cxxlab_abort_msg(msg) common_abort_msg(msg)
+#define cxxlab_assertf(expr, ...) common_assertf(expr, __VA_ARGS__)
+#define cxxlab_assert_warn(expr) assert_warn(expr)
 
 #endif  // COMMON_CASSERT_H

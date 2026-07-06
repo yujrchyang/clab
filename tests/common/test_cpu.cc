@@ -4,7 +4,7 @@
 
 #include "common/cpu.h"
 
-using namespace clab;
+using namespace TOPNSPC;
 
 TEST(CpuTest, ProbeRunsWithoutCrash) {
     EXPECT_NO_FATAL_FAILURE(cpu::probe());

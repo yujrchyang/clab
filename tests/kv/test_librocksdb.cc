@@ -14,10 +14,10 @@
 #include <rocksdb/slice.h>
 #include <rocksdb/write_batch.h>
 
-#include "clab_test.h"
+#include "cxxlab_test.h"
 
 static std::string tmpdir() {
-    auto tmpl = clab_tmp_dir("rocksdb");
+    auto tmpl = cxxlab_tmp_dir("rocksdb");
     char *buf = tmpl.data();
     if (!mkdtemp(buf))
         return {};

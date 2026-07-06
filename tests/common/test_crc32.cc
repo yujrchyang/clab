@@ -7,9 +7,9 @@
 
 #include "common/crc32.h"
 
-using namespace clab;
+using namespace TOPNSPC;
 
-namespace clab {
+namespace TOPNSPC {
 extern uint32_t crc32c_software_fallback(
     const uint8_t *data, size_t length, uint32_t previous_crc);
 }

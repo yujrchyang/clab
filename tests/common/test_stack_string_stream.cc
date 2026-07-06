@@ -6,9 +6,9 @@
 
 #include "common/stack_string_stream.h"
 
-using clab::CachedStackStringStream;
-using clab::StackStringBuf;
-using clab::StackStringStream;
+using TOPNSPC::CachedStackStringStream;
+using TOPNSPC::StackStringBuf;
+using TOPNSPC::StackStringStream;
 
 TEST(StackStringBufTest, SmallWriteWithinStackSize) {
     StackStringBuf<64> buf;

@@ -190,7 +190,7 @@ struct bluefs_transaction_t {
 
 > **TBD**: CRC32 校验和块边界对齐将在日志写入路径（Phase 1.8）中添加。
 
-> **clab 简化**: 移除 `OP_ALLOC_ADD`/`OP_ALLOC_RM`（已废弃的历史操作）。
+> **cxxlab 简化**: 移除 `OP_ALLOC_ADD`/`OP_ALLOC_RM`（已废弃的历史操作）。
 
 ### 2.3 设备管理
 
@@ -1155,7 +1155,7 @@ if (mirror) {
 
 ### 7.1 与 Ceph 的差异汇总
 
-| 特性 | Ceph BlueFS | clab |
+| 特性 | Ceph BlueFS | cxxlab |
 | --- | --- | --- |
 | 日志压缩 | 异步（默认） | 异步（保留） |
 | VolumeSelector | RocksDBBlueFSVolumeSelector（默认） | RocksDBBlueFSVolumeSelector（保留） |

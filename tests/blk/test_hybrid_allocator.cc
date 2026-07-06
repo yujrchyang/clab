@@ -7,8 +7,8 @@
 #include <vector>
 
 #include "blk/allocator.h"
-#include "blk/hybrid_allocator.h"
 #include "blk/extent_types.h"
+#include "blk/hybrid_allocator.h"
 #include "common/intarith.h"
 
 using namespace TOPNSPC;
@@ -31,7 +31,7 @@ protected:
         alloc->init_add_free(0, DEV_SIZE);
     }
 
-    std::unique_ptr<HybridAllocator, void(*)(HybridAllocator *)> alloc{
+    std::unique_ptr<HybridAllocator, void (*)(HybridAllocator *)> alloc{
         nullptr, [](HybridAllocator *a) { a->shutdown(); delete a; }};
 };
 

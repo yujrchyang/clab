@@ -17,7 +17,7 @@ void IOContext::try_aio_wake() {
 }
 
 void IOContext::release_running_aios() {
-    clab_assert(num_running.load() == 0);
+    cxxlab_assert(num_running.load() == 0);
     running_aios.clear();
 }
 

@@ -6,7 +6,7 @@
 
 #include "common/spinlock.h"
 
-using clab::spinlock;
+using TOPNSPC::spinlock;
 
 TEST(SpinlockTest, BasicLockUnlock) {
     spinlock lock;

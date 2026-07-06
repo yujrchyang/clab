@@ -7,7 +7,7 @@
 
 #include "common/deleter.h"
 
-using namespace clab;
+using namespace TOPNSPC;
 
 // =========================================================
 // deleter basics

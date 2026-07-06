@@ -15,8 +15,8 @@
 #include "blk/kernel_device.h"
 #include "bluestore/blue_rocks_env.h"
 #include "bluestore/bluefs.h"
-#include "clab_test.h"
 #include "common/cassert.h"
+#include "cxxlab_test.h"
 #include "rocksdb/env.h"
 
 using namespace TOPNSPC;
@@ -31,7 +31,7 @@ protected:
     std::unique_ptr<BlueRocksEnv> env_;
 
     void SetUp() override {
-        auto tmpl = clab_tmp_path("bluere_test");
+        auto tmpl = cxxlab_tmp_path("bluere_test");
         tmp_fd_ = ::mkstemp(tmpl.data());
         ASSERT_GE(tmp_fd_, 0);
         tmp_path_ = tmpl;
@@ -636,7 +636,7 @@ TEST_F(BlueRocksEnvTest, GetTestDirectory) {
     ASSERT_TRUE(env_->GetTestDirectory(&p1).ok());
     ASSERT_TRUE(env_->GetTestDirectory(&p2).ok());
     ASSERT_EQ(p1, p2);  // Subsequent calls return the same directory
-    ASSERT_TRUE(p1.find("clab_rocksdb_test_dir") != std::string::npos);
+    ASSERT_TRUE(p1.find("cxxlab_rocksdb_test_dir") != std::string::npos);
 }
 
 TEST_F(BlueRocksEnvTest, AbsolutePathEscape) {

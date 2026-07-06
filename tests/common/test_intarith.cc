@@ -6,7 +6,7 @@
 
 #include "common/intarith.h"
 
-using namespace clab;
+using namespace TOPNSPC;
 
 TEST(DivRoundUpTest, Basic) {
     EXPECT_EQ(div_round_up(10, 5), 2U);

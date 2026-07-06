@@ -1,5 +1,5 @@
 cmake_minimum_required (VERSION 3.5)
-project(clab VERSION 0.1.0 LANGUAGES CXX C)
+project(cxxlab VERSION 0.1.0 LANGUAGES CXX C)
 
 if(NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
     message(FATAL_ERROR "This project only supports Linux. Detected system: ${CMAKE_SYSTEM_NAME}")

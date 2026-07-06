@@ -26,9 +26,9 @@ struct uuid_d {
 
     void generate() {
         int fd = open("/dev/urandom", O_RDONLY);
-        clab_assert(fd >= 0);
+        cxxlab_assert(fd >= 0);
         auto r = read(fd, uuid.data(), 16);
-        clab_assert(r == 16);
+        cxxlab_assert(r == 16);
         close(fd);
         // RFC 4122 version 4: set bits 12-15 of byte 7 to 0100
         uuid[6] = (uuid[6] & 0x0f) | 0x40;

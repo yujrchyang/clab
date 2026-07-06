@@ -7,7 +7,7 @@
 
 #include "common/armor.h"
 
-using namespace clab;
+using namespace TOPNSPC;
 
 TEST(ArmorTest, EmptyInput) {
     char buf[16] = {};

@@ -4,8 +4,8 @@
 
 #include "common/buffer_error.h"
 
-using clab::buffer::end_of_buffer;
-using clab::buffer::malformed_input;
+using TOPNSPC::buffer::end_of_buffer;
+using TOPNSPC::buffer::malformed_input;
 
 TEST(BufferErrorTest, EndOfBufferIsException) {
     try {
@@ -34,7 +34,7 @@ TEST(BufferErrorTest, MalformedInputIsException) {
 TEST(BufferErrorTest, EndOfBufferIsError) {
     try {
         throw end_of_buffer();
-    } catch (const clab::buffer::error &e) {
+    } catch (const TOPNSPC::buffer::error &e) {
         SUCCEED();
     }
 }
@@ -42,7 +42,7 @@ TEST(BufferErrorTest, EndOfBufferIsError) {
 TEST(BufferErrorTest, MalformedInputIsError) {
     try {
         throw malformed_input("err");
-    } catch (const clab::buffer::error &e) {
+    } catch (const TOPNSPC::buffer::error &e) {
         SUCCEED();
     }
 }

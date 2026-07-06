@@ -7,8 +7,8 @@
 
 #include "common/scope_guard.h"
 
-using clab::make_scope_guard;
-using clab::scope_guard;
+using TOPNSPC::make_scope_guard;
+using TOPNSPC::scope_guard;
 
 TEST(ScopeGuardTest, FiresOnDestruction) {
     bool fired = false;

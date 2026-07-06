@@ -508,7 +508,7 @@ int BlueFS::_consume_dirty(uint64_t seq) {
 int BlueFS::_flush_and_sync_log(uint64_t want_seq) {
     if (want_seq && want_seq <= dirty_.seq_stable) return 0;
     if (want_seq) {
-        clab_assert(want_seq <= dirty_.seq_live);
+        cxxlab_assert(want_seq <= dirty_.seq_live);
     }
 
     std::unique_lock log_l(log_.lock);
@@ -790,7 +790,7 @@ int BlueFS::_replay(bool no_stdout) {
                 if (dit != nodes_.dir_map.end()) {
                     auto fit = dit->second->file_map.find(filename);
                     if (fit != dit->second->file_map.end()) {
-                        clab_assert(fit->second->refs > 0);
+                        cxxlab_assert(fit->second->refs > 0);
                         --fit->second->refs;
                         dit->second->file_map.erase(fit);
                     }
@@ -819,7 +819,7 @@ int BlueFS::_replay(bool no_stdout) {
                 bluefs_fnode_delta_t delta;
                 decode(delta, op_p);
                 auto file = _get_file(delta.ino);
-                clab_assert(delta.offset == file->fnode.allocated);
+                cxxlab_assert(delta.offset == file->fnode.allocated);
                 file->fnode.mtime = delta.mtime;
                 file->fnode.size = delta.size;
                 file->fnode.claim_extents(delta.extents);
@@ -1700,7 +1700,7 @@ int BlueFS::lock_file(std::string_view dirname, std::string_view filename,
 
 int BlueFS::unlock_file(FileLock *l) {
     std::lock_guard nl(nodes_.lock);
-    clab_assert(l->file->locked);
+    cxxlab_assert(l->file->locked);
     l->file->locked = false;
     delete l;
     return 0;
@@ -1733,7 +1733,7 @@ void BlueFS::flush_range(FileWriter *h, uint64_t offset, uint64_t length) {
 int BlueFS::preallocate(FileRef f, uint64_t off, uint64_t len) {
     std::lock_guard ll(log_.lock);
     if (f->deleted) return 0;
-    clab_assert(f->fnode.ino > 1);
+    cxxlab_assert(f->fnode.ino > 1);
     uint64_t allocated = f->fnode.get_allocated();
     if (off + len > allocated) {
         uint64_t want = off + len - allocated;

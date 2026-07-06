@@ -12,7 +12,7 @@
 #include "blk/block_device.h"
 #include "blk/io_context.h"
 #include "blk/kernel_device.h"
-#include "clab_test.h"
+#include "cxxlab_test.h"
 
 using namespace TOPNSPC;
 
@@ -25,7 +25,7 @@ protected:
     static constexpr uint64_t kFileSize = 4 << 20;  // 4 MiB
 
     void SetUp() override {
-        auto tmpl = clab_tmp_path("kernel_device");
+        auto tmpl = cxxlab_tmp_path("kernel_device");
         tmp_fd_ = ::mkstemp(tmpl.data());
         ASSERT_GE(tmp_fd_, 0) << "mkstemp failed";
         tmp_path_ = tmpl;

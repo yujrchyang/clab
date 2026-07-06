@@ -4,7 +4,7 @@
 
 #include "common/page.h"
 
-using clab::page;
+using TOPNSPC::page;
 
 TEST(PageTest, SizeIsPositiveAndPowerOfTwo) {
     auto sz = page().size;

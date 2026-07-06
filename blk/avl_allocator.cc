@@ -86,7 +86,7 @@ uint64_t AvlAllocator::_pick_block_fits(uint64_t size, uint64_t align) {
 }
 
 void AvlAllocator::_add_to_tree(uint64_t start, uint64_t size) {
-    clab_assert(size != 0);
+    cxxlab_assert(size != 0);
     uint64_t end = start + size;
 
     auto rs_after = range_tree_.upper_bound(
@@ -137,7 +137,7 @@ void AvlAllocator::_process_range_removal(uint64_t start, uint64_t end,
     if (left_over && right_over) {
         auto old_right_end = rs->end;
         auto insert_pos = rs;
-        clab_assert(insert_pos != range_tree_.end());
+        cxxlab_assert(insert_pos != range_tree_.end());
         ++insert_pos;
         rs->end = start;
         _try_insert_range(end, old_right_end, &insert_pos);
@@ -155,19 +155,19 @@ void AvlAllocator::_process_range_removal(uint64_t start, uint64_t end,
 
 bool AvlAllocator::_remove_from_tree(uint64_t start, uint64_t size) {
     uint64_t end = start + size;
-    clab_assert(size != 0);
+    cxxlab_assert(size != 0);
 
     auto rs = range_tree_.find(range_t{start, end}, range_tree_.key_comp());
     if (rs == range_tree_.end() || rs->start > start || rs->end < end)
         return false;
-    clab_assert(size <= num_free_);
+    cxxlab_assert(size <= num_free_);
 
     _process_range_removal(start, end, rs);
     return true;
 }
 
 void AvlAllocator::_range_size_tree_rm(range_seg_t &r) {
-    clab_assert(num_free_ >= r.length());
+    cxxlab_assert(num_free_ >= r.length());
     num_free_ -= r.length();
     range_size_tree_.erase(r);
 }
@@ -214,7 +214,7 @@ void AvlAllocator::_try_remove_from_tree(
     uint64_t start, uint64_t size,
     std::function<void(uint64_t, uint64_t, bool)> cb) {
     uint64_t end = start + size;
-    clab_assert(size != 0);
+    cxxlab_assert(size != 0);
 
     auto rs = range_tree_.find(range_t{start, end}, range_tree_.key_comp());
     if (rs == range_tree_.end() || rs->start >= end) {
@@ -253,7 +253,7 @@ int AvlAllocator::_allocate_single(uint64_t size, uint64_t unit,
         if (max_size < unit)
             return -ENOSPC;
         size = p2align(max_size, unit);
-        clab_assert(size > 0);
+        cxxlab_assert(size > 0);
         force_range_size_alloc = true;
     }
 
@@ -266,7 +266,7 @@ int AvlAllocator::_allocate_single(uint64_t size, uint64_t unit,
         start = -1ULL;
     } else {
         uint64_t align = size & -size;
-        clab_assert(align != 0);
+        cxxlab_assert(align != 0);
         uint64_t *cursor = &lbas_[cbits(align) - 1];
         start = _pick_block_after(cursor, size, unit);
     }
@@ -310,8 +310,8 @@ int64_t AvlAllocator::_allocate(uint64_t want, uint64_t unit,
 int64_t AvlAllocator::allocate(uint64_t want, uint64_t unit,
                                uint64_t max_alloc_size, int64_t hint,
                                PExtentVector *extents) {
-    clab_assert(isp2(unit));
-    clab_assert(want % unit == 0);
+    cxxlab_assert(isp2(unit));
+    cxxlab_assert(want % unit == 0);
 
     if (max_alloc_size == 0)
         max_alloc_size = want;
@@ -328,7 +328,7 @@ void AvlAllocator::_release(const interval_set<uint64_t> &release_set) {
     for (auto p = release_set.begin(); p != release_set.end(); ++p) {
         auto offset = p.get_start();
         auto length = p.get_len();
-        clab_assert(offset + length <= uint64_t(device_size));
+        cxxlab_assert(offset + length <= uint64_t(device_size));
         _add_to_tree(offset, length);
     }
 }
@@ -381,14 +381,14 @@ void AvlAllocator::foreach (
 void AvlAllocator::init_add_free(uint64_t offset, uint64_t length) {
     if (!length) return;
     std::lock_guard l(lock_);
-    clab_assert(offset + length <= uint64_t(device_size));
+    cxxlab_assert(offset + length <= uint64_t(device_size));
     _add_to_tree(offset, length);
 }
 
 void AvlAllocator::init_rm_free(uint64_t offset, uint64_t length) {
     if (!length) return;
     std::lock_guard l(lock_);
-    clab_assert(offset + length <= uint64_t(device_size));
+    cxxlab_assert(offset + length <= uint64_t(device_size));
     _remove_from_tree(offset, length);
 }
 

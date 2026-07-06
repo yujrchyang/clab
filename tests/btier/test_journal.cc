@@ -9,8 +9,8 @@
 #include "blk/block_device.h"
 #include "btier/btier_types.h"
 #include "btier/journal.h"
-#include "clab_test.h"
 #include "common/buffer.h"
+#include "cxxlab_test.h"
 
 using namespace TOPNSPC;
 using namespace TOPNSPC::btier;
@@ -23,7 +23,7 @@ protected:
     static constexpr uint64_t kFileSize = 8 * 1024 * 1024;
 
     void SetUp() override {
-        auto tmpl = clab_tmp_path("journal_test");
+        auto tmpl = cxxlab_tmp_path("journal_test");
         tmp_fd_ = ::mkstemp(tmpl.data());
         ASSERT_GE(tmp_fd_, 0);
         tmp_path_ = tmpl;

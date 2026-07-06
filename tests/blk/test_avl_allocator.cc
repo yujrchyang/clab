@@ -29,7 +29,7 @@ protected:
         alloc->init_add_free(0, DEV_SIZE);
     }
 
-    std::unique_ptr<AvlAllocator, void(*)(AvlAllocator *)> alloc{
+    std::unique_ptr<AvlAllocator, void (*)(AvlAllocator *)> alloc{
         nullptr, [](AvlAllocator *a) { a->shutdown(); delete a; }};
 };
 
@@ -146,7 +146,7 @@ TEST_F(AvlAllocatorTest, DoubleReleaseFails) {
     alloc->release(extents);
     EXPECT_EQ(alloc->get_free(), DEV_SIZE);
     // Releasing same extents again should be a no-op (or crash in debug mode)
-    // In release mode, the double-release is a logic error that clab_assert may catch.
+    // In release mode, the double-release is a logic error that cxxlab_assert may catch.
     // We just verify free count doesn't exceed device size.
     EXPECT_LE(alloc->get_free(), DEV_SIZE);
 }

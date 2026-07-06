@@ -10,9 +10,9 @@
 #include <unordered_map>
 #include <vector>
 
+#include "blk/allocator.h"
 #include "blk/block_device.h"
 #include "blk/io_context.h"
-#include "blk/allocator.h"
 #include "bluestore/bluefs_config.h"
 #include "bluestore/bluefs_types.h"
 #include "bluestore/bluefs_volume_selector.h"

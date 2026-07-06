@@ -42,7 +42,7 @@ static std::string make_tmpfile() {
 }
 
 static std::string make_payload(uint64_t block_size) {
-    std::string s = "Hello from clab block device demo!";
+    std::string s = "Hello from cxxlab block device demo!";
     while (s.size() % block_size)
         s.push_back('\0');
     return s;

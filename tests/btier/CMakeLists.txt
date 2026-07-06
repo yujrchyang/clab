@@ -3,7 +3,7 @@ target_include_directories(test_btier_types PRIVATE ${PROJECT_SOURCE_DIR})
 target_link_libraries(test_btier_types
     PRIVATE
         btier
-        clab_test_helpers
+        cxxlab_test_helpers
         GTest::gtest_main
 )
 add_test(NAME test_btier_types COMMAND test_btier_types)
@@ -13,7 +13,7 @@ target_include_directories(test_config PRIVATE ${PROJECT_SOURCE_DIR})
 target_link_libraries(test_config
     PRIVATE
         btier
-        clab_test_helpers
+        cxxlab_test_helpers
         GTest::gtest_main
 )
 add_test(NAME test_config COMMAND test_config)
@@ -23,7 +23,7 @@ target_include_directories(test_extent_map PRIVATE ${PROJECT_SOURCE_DIR})
 target_link_libraries(test_extent_map
     PRIVATE
         btier
-        clab_test_helpers
+        cxxlab_test_helpers
         GTest::gtest_main
 )
 add_test(NAME test_extent_map COMMAND test_extent_map)
@@ -33,7 +33,7 @@ target_include_directories(test_key_map PRIVATE ${PROJECT_SOURCE_DIR})
 target_link_libraries(test_key_map
     PRIVATE
         btier
-        clab_test_helpers
+        cxxlab_test_helpers
         GTest::gtest_main
 )
 add_test(NAME test_key_map COMMAND test_key_map)
@@ -44,7 +44,7 @@ target_link_libraries(test_journal
     PRIVATE
         btier
         blk
-        clab_test_helpers
+        cxxlab_test_helpers
         GTest::gtest_main
 )
 add_test(NAME test_journal COMMAND test_journal)
@@ -55,7 +55,7 @@ target_link_libraries(test_btier
     PRIVATE
         btier
         blk
-        clab_test_helpers
+        cxxlab_test_helpers
         GTest::gtest_main
 )
 add_test(NAME test_btier COMMAND test_btier)
@@ -66,7 +66,7 @@ target_link_libraries(test_scoring
     PRIVATE
         btier
         blk
-        clab_test_helpers
+        cxxlab_test_helpers
         GTest::gtest_main
 )
 add_test(NAME test_scoring COMMAND test_scoring)
@@ -77,7 +77,7 @@ target_link_libraries(test_migration
     PRIVATE
         btier
         blk
-        clab_test_helpers
+        cxxlab_test_helpers
         GTest::gtest_main
 )
 add_test(NAME test_migration COMMAND test_migration)
@@ -88,7 +88,7 @@ target_link_libraries(test_e2e
     PRIVATE
         btier
         blk
-        clab_test_helpers
+        cxxlab_test_helpers
         GTest::gtest_main
 )
 add_test(NAME test_e2e COMMAND test_e2e)

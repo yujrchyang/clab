@@ -4,7 +4,7 @@
 #include <string>
 
 #include "btier/config.h"
-#include "clab_test.h"
+#include "cxxlab_test.h"
 
 using namespace TOPNSPC::btier;
 
@@ -31,7 +31,7 @@ TEST(ConfigTest, DefaultValues) {
 }
 
 TEST(ConfigTest, SaveLoadRoundtrip) {
-    auto tmpl = clab_tmp_path("config_test");
+    auto tmpl = cxxlab_tmp_path("config_test");
     std::string path(tmpl);
 
     BtierConfig orig;
@@ -86,7 +86,7 @@ TEST(ConfigTest, SaveLoadRoundtrip) {
 }
 
 TEST(ConfigTest, MissingFieldsUseDefaults) {
-    auto tmpl = clab_tmp_path("config_missing");
+    auto tmpl = cxxlab_tmp_path("config_missing");
     std::string path(tmpl);
 
     // Write a minimal config with only device paths
@@ -110,7 +110,7 @@ TEST(ConfigTest, MissingFieldsUseDefaults) {
 }
 
 TEST(ConfigTest, UnknownFieldsIgnored) {
-    auto tmpl = clab_tmp_path("config_unknown");
+    auto tmpl = cxxlab_tmp_path("config_unknown");
     std::string path(tmpl);
 
     FILE *f = std::fopen(path.c_str(), "w");

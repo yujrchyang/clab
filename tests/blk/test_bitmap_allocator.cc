@@ -29,7 +29,7 @@ protected:
         alloc->init_add_free(0, DEV_SIZE);
     }
 
-    std::unique_ptr<BitmapAllocator, void(*)(BitmapAllocator *)> alloc{
+    std::unique_ptr<BitmapAllocator, void (*)(BitmapAllocator *)> alloc{
         nullptr, [](BitmapAllocator *a) { a->shutdown(); delete a; }};
 };
 

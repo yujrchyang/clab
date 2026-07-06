@@ -135,7 +135,7 @@ uint64_t size_2_block_count(uint64_t target_size) const {
 
 ### 3.1 FreelistManager 抽象基类
 
-所有模块均位于 `TOPNSPC`（即 `clab`）命名空间下，`bufferlist` 等类型可直接使用。
+所有模块均位于 `TOPNSPC`（即 `cxxlab`）命名空间下，`bufferlist` 等类型可直接使用。
 
 ```cpp
 class FreelistManager {
@@ -410,7 +410,7 @@ copy_allocator_content_to_fm(alloc, fm);
 | `_read_cfg()` 从 bdev label 读取配置 | 保留可选的 cfg_reader 接口，但主要依赖 `_load_from_db()` |
 | `_sync()` / `_expand()` 版本兼容逻辑 | 初始版本不做 expand（固定磁盘大小），可后续补充 |
 | `ZonedFreelistManager` | 不做移植 |
-| `get_meta()` 写 bdev label | 保留接口，clab 暂不使用 |
+| `get_meta()` 写 bdev label | 保留接口，cxxlab 暂不使用 |
 
 ### 6.4 与 kv 层的集成
 
@@ -441,7 +441,7 @@ db->submit_transaction(t);
 
 BitmapFreelistManager 作为 `bluestore` 库的内部组件编译，链接 `kv`（获取 KeyValueDB 接口）和 `common`（bufferlist，assert 等）。
 
-命名空间策略：各模块统一在 `TOPNSPC`（即 `clab`）命名空间内，`bufferlist` 等类型可直接使用。
+命名空间策略：各模块统一在 `TOPNSPC`（即 `cxxlab`）命名空间内，`bufferlist` 等类型可直接使用。
 现有 `kv/`（`namespace kv`）、`blk/`（全局）会在后续对齐，引用时按现状加对应前缀（如 `kv::XorMergeOperator`）。
 
 ## 7. 参考

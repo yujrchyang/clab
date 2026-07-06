@@ -287,8 +287,8 @@ buffer::ptr::ptr(ptr &&p) noexcept : _raw(p._raw), _off(p._off), _len(p._len) {
 
 buffer::ptr::ptr(const ptr &p, unsigned o, unsigned l)
     : _raw(p._raw), _off(p._off + o), _len(l) {
-    clab_assert(o + l <= p._len);
-    clab_assert(_raw);
+    cxxlab_assert(o + l <= p._len);
+    cxxlab_assert(_raw);
     _raw->nref++;
 }
 
@@ -362,22 +362,22 @@ void buffer::ptr::release() {
 }
 
 const char *buffer::ptr::c_str() const {
-    clab_assert(_raw);
+    cxxlab_assert(_raw);
     return _raw->get_data() + _off;
 }
 
 char *buffer::ptr::c_str() {
-    clab_assert(_raw);
+    cxxlab_assert(_raw);
     return _raw->get_data() + _off;
 }
 
 const char *buffer::ptr::end_c_str() const {
-    clab_assert(_raw);
+    cxxlab_assert(_raw);
     return _raw->get_data() + _off + _len;
 }
 
 char *buffer::ptr::end_c_str() {
-    clab_assert(_raw);
+    cxxlab_assert(_raw);
     return _raw->get_data() + _off + _len;
 }
 
@@ -386,34 +386,34 @@ unsigned buffer::ptr::unused_tail_length() const {
 }
 
 const char &buffer::ptr::operator[](unsigned n) const {
-    clab_assert(_raw);
-    clab_assert(n < _len);
+    cxxlab_assert(_raw);
+    cxxlab_assert(n < _len);
     return _raw->get_data()[_off + n];
 }
 
 char &buffer::ptr::operator[](unsigned n) {
-    clab_assert(_raw);
-    clab_assert(n < _len);
+    cxxlab_assert(_raw);
+    cxxlab_assert(n < _len);
     return _raw->get_data()[_off + n];
 }
 
 const char *buffer::ptr::raw_c_str() const {
-    clab_assert(_raw);
+    cxxlab_assert(_raw);
     return _raw->get_data();
 }
 
 unsigned buffer::ptr::raw_length() const {
-    clab_assert(_raw);
+    cxxlab_assert(_raw);
     return _raw->get_len();
 }
 
 int buffer::ptr::raw_nref() const {
-    clab_assert(_raw);
+    cxxlab_assert(_raw);
     return _raw->nref;
 }
 
 void buffer::ptr::copy_out(unsigned o, unsigned l, char *dest) const {
-    clab_assert(_raw);
+    cxxlab_assert(_raw);
     if (o + l > _len)
         throw end_of_buffer();
     char *src = _raw->get_data() + _off + o;
@@ -443,8 +443,8 @@ bool buffer::ptr::is_zero() const {
 }
 
 unsigned buffer::ptr::append(char c) {
-    clab_assert(_raw);
-    clab_assert(1 <= unused_tail_length());
+    cxxlab_assert(_raw);
+    cxxlab_assert(1 <= unused_tail_length());
     char *ptr = _raw->get_data() + _off + _len;
     *ptr = c;
     _len++;
@@ -452,8 +452,8 @@ unsigned buffer::ptr::append(char c) {
 }
 
 unsigned buffer::ptr::append(const char *p, unsigned l) {
-    clab_assert(_raw);
-    clab_assert(l <= unused_tail_length());
+    cxxlab_assert(_raw);
+    cxxlab_assert(l <= unused_tail_length());
     char *c = _raw->get_data() + _off + _len;
     maybe_inline_memcpy(c, p, l, 32);
     _len += l;
@@ -461,8 +461,8 @@ unsigned buffer::ptr::append(const char *p, unsigned l) {
 }
 
 unsigned buffer::ptr::append_zeros(unsigned l) {
-    clab_assert(_raw);
-    clab_assert(l <= unused_tail_length());
+    cxxlab_assert(_raw);
+    cxxlab_assert(l <= unused_tail_length());
     char *c = _raw->get_data() + _off + _len;
     memset(c, 0, l);
     _len += l;
@@ -470,9 +470,9 @@ unsigned buffer::ptr::append_zeros(unsigned l) {
 }
 
 void buffer::ptr::copy_in(unsigned o, unsigned l, const char *src, bool crc_reset) {
-    clab_assert(_raw);
-    clab_assert(o <= _len);
-    clab_assert(o + l <= _len);
+    cxxlab_assert(_raw);
+    cxxlab_assert(o <= _len);
+    cxxlab_assert(o + l <= _len);
     char *dest = _raw->get_data() + _off + o;
     if (crc_reset)
         _raw->invalidate_crc();
@@ -486,7 +486,7 @@ void buffer::ptr::zero(bool crc_reset) {
 }
 
 void buffer::ptr::zero(unsigned o, unsigned l, bool crc_reset) {
-    clab_assert(o + l <= _len);
+    cxxlab_assert(o + l <= _len);
     if (crc_reset)
         _raw->invalidate_crc();
     memset(c_str() + o, 0, l);
@@ -807,7 +807,7 @@ bool buffer::list::contents_equal(const void *const other,
 
     const auto *other_buf = reinterpret_cast<const char *>(other);
     for (const auto &bp : buffers()) {
-        clab_assert(bp.length() <= length);
+        cxxlab_assert(bp.length() <= length);
         if (std::memcmp(bp.c_str(), other_buf, bp.length()) != 0) {
             return false;
         } else {
@@ -871,7 +871,7 @@ void buffer::list::zero() {
 }
 
 void buffer::list::zero(const unsigned o, const unsigned l) {
-    clab_assert(o + l <= _len);
+    cxxlab_assert(o + l <= _len);
     unsigned p = 0;
     for (auto &node : _buffers) {
         if (p + node.length() > o) {
@@ -1102,7 +1102,7 @@ buffer::list::reserve_t buffer::list::obtain_contiguous_space(
         _carriage = new_back;
         return {new_back->c_str(), &new_back->_len, &_len};
     } else {
-        clab_assert(!_buffers.empty());
+        cxxlab_assert(!_buffers.empty());
         if (unlikely(_carriage != &_buffers.back())) {
             auto bptr = ptr_node::create(*_carriage, _carriage->length(), 0);
             _carriage = bptr.get();
@@ -1122,7 +1122,7 @@ void buffer::list::append(ptr &&bp) {
 }
 
 void buffer::list::append(const ptr &bp, unsigned off, unsigned len) {
-    clab_assert(len + off <= bp.length());
+    cxxlab_assert(len + off <= bp.length());
     if (!_buffers.empty()) {
         ptr &l = _buffers.back();
         if (l._raw == bp._raw && l.end() == bp.start() + off) {
@@ -1213,7 +1213,7 @@ const char &buffer::list::operator[](unsigned n) const {
         }
         return node[n];
     }
-    clab_abort_msg("unreachable");
+    cxxlab_abort_msg("unreachable");
 }
 
 char *buffer::list::c_str() {
@@ -1247,7 +1247,7 @@ void buffer::list::substr_of(const list &other, unsigned off, unsigned len) {
         off -= (*curbuf).length();
         ++curbuf;
     }
-    clab_assert(len == 0 || curbuf != std::cend(other._buffers));
+    cxxlab_assert(len == 0 || curbuf != std::cend(other._buffers));
 
     while (len > 0) {
         if (off + len < curbuf->length()) {
@@ -1274,12 +1274,12 @@ void buffer::list::splice(unsigned off, unsigned len, list *claim_by) {
     if (off >= length())
         throw end_of_buffer();
 
-    clab_assert(len > 0);
+    cxxlab_assert(len > 0);
 
     auto curbuf = std::begin(_buffers);
     auto curbuf_prev = _buffers.before_begin();
     while (off > 0) {
-        clab_assert(curbuf != std::end(_buffers));
+        cxxlab_assert(curbuf != std::end(_buffers));
         if (off >= (*curbuf).length()) {
             off -= (*curbuf).length();
             curbuf_prev = curbuf++;
@@ -1350,7 +1350,7 @@ void buffer::list::decode_base64(buffer::list &e) {
         hexdump(oss);
         throw buffer::malformed_input(oss.str().c_str());
     }
-    clab_assert(l <= (int)bp.length());
+    cxxlab_assert(l <= (int)bp.length());
     bp.set_length(l);
     push_back(std::move(bp));
 }

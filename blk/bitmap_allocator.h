@@ -10,8 +10,8 @@
 #include <vector>
 
 #include "blk/allocator.h"
-#include "common/cassert.h"
 #include "blk/extent_types.h"
+#include "common/cassert.h"
 #include "common/intarith.h"
 
 namespace TOPNSPC {
@@ -391,7 +391,7 @@ inline void AllocatorLevel01Loose::_fragment_and_emplace(
     }
     while (len > 0) {
         uint64_t chunk = (max_length > 0 && len > max_length) ? max_length : len;
-        clab_assert(chunk <= std::numeric_limits<uint32_t>::max());
+        cxxlab_assert(chunk <= std::numeric_limits<uint32_t>::max());
         res->emplace_back(offset, static_cast<uint32_t>(chunk));
         if (allocated) *allocated += chunk;
         offset += chunk;
@@ -518,7 +518,7 @@ void AllocatorLevel02<L1>::_mark_allocated(uint64_t offset, uint64_t length) {
     uint64_t l2p = offset / l2_granularity;
     uint64_t l2e = round_up(offset + length, l2_granularity) / l2_granularity;
     _mark_l2_allocated(l2p, l2e);
-    clab_assert(available >= length);
+    cxxlab_assert(available >= length);
     available -= length;
 }
 

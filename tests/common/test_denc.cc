@@ -2,9 +2,9 @@
 
 #include "common/denc.h"
 
-using namespace clab;
+using namespace TOPNSPC;
 
-namespace clab {
+namespace TOPNSPC {
 struct test_foo {
     int32_t x;
     int64_t y;
@@ -18,7 +18,7 @@ struct test_foo {
     }
 };
 WRITE_CLASS_DENC(test_foo)
-}  // namespace clab
+}  // namespace TOPNSPC
 
 TEST(common_denc, encode_decode_roundtrip) {
     test_foo f{42, 99, "hello"};

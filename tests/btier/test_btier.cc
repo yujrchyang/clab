@@ -10,8 +10,8 @@
 
 #include "btier/btier.h"
 #include "btier/btier_types.h"
-#include "clab_test.h"
 #include "common/buffer.h"
+#include "cxxlab_test.h"
 
 using namespace TOPNSPC;
 using namespace TOPNSPC::btier;
@@ -28,13 +28,13 @@ protected:
     BtierConfig cfg;
 
     void SetUp() override {
-        auto tmpl = clab_tmp_path("btier_fast");
+        auto tmpl = cxxlab_tmp_path("btier_fast");
         fast_fd_ = ::mkstemp(tmpl.data());
         ASSERT_GE(fast_fd_, 0);
         fast_path_ = tmpl;
         ::fallocate(fast_fd_, 0, 0, kFastSize);
 
-        auto tmpl2 = clab_tmp_path("btier_slow");
+        auto tmpl2 = cxxlab_tmp_path("btier_slow");
         slow_fd_ = ::mkstemp(tmpl2.data());
         ASSERT_GE(slow_fd_, 0);
         slow_path_ = tmpl2;

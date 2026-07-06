@@ -1,4 +1,4 @@
-# clab
+# cxxlab
 
 ## Build & Toolchain
 
@@ -32,11 +32,11 @@ never migrate across blank lines.
 ## Progress
 
 ### Goal
-Implement BlueStore 引擎 (BlueFS + BlueRocksEnv + BlueStore) for clab, modeled after Ceph's `src/os/bluestore/*`, layered on top of existing kv/ (RocksDBStore) and bluestore/ (FreelistManager + Allocator) infrastructure.
+Implement BlueStore 引擎 (BlueFS + BlueRocksEnv + BlueStore) for cxxlab, modeled after Ceph's `src/os/bluestore/*`, layered on top of existing kv/ (RocksDBStore) and bluestore/ (FreelistManager + Allocator) infrastructure.
 
 ### Key Context
-- `TOPNSPC` macro defined in `common/common_fwd.h` → expands to `clab`
-- `bufferlist` = `clab::bufferlist`
+- `TOPNSPC` macro defined in `common/common_fwd.h` → expands to `cxxlab`
+- `bufferlist` = `cxxlab::bufferlist`
 - Key encoding: `prefix + '\0' + inner_key` (both backends, Ceph-compatible)
 - RocksDB version: v7.10.2 (via submodule `third_party/rocksdb/`)
 - Ceph reference: `/home/yujrchyang/opensrc/ceph/src/kv/*` and `src/os/bluestore/*`
@@ -99,7 +99,7 @@ decode(e, bl.cbegin());   // denc(o, p) 顶层包装
   - `delete_range_threshold`: configurable via options map, reserved for small-range optimization
 - **MemDB implementation:**
   - `MDBTransactionImpl::Op`: refactored with explicit `end` field for `rm_range_keys` (removed reuse of `value`)
-  - `_merge()`: uses `clab_assert(mop)` instead of silent return
+  - `_merge()`: uses `cxxlab_assert(mop)` instead of silent return
   - Iterator invalidation: `uint64_t seqno_` incremented on every mutation; `MDBWholeSpaceIteratorImpl` detects stale seqno on each seek/lower_bound/upper_bound and rebuilds snapshot from `std::map` under lock
 - **PrefixIteratorImpl:**
   - Removed `skip_to_next_valid()`/`skip_to_prev_valid()` direction-check bug
@@ -251,7 +251,7 @@ decode(e, bl.cbegin());   // denc(o, p) 顶层包装
 - `tests/bluestore/test_avl_allocator.cc`: 21 AvlAllocator tests
 - `tests/bluestore/test_bitmap_allocator.cc`: 33 BitmapAllocator tests
 - `tests/bluestore/test_hybrid_allocator.cc`: 19 HybridAllocator tests
-- `tests/kv/CMakeLists.txt`: test targets linking kv + RocksDB + clab_test_helpers + GTest
+- `tests/kv/CMakeLists.txt`: test targets linking kv + RocksDB + cxxlab_test_helpers + GTest
 - `docs/design/keyvalue-db.md`: full design specification
 - `docs/design/freelist-manager.md`: FreelistManager/BitmapFreelistManager design analysis (Ceph reference: `src/os/bluestore/FreelistManager.*`, `BitmapFreelistManager.*`)
 - `docs/design/allocator.md`: Allocator design (Avl + Bitmap + Hybrid)

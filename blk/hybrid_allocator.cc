@@ -83,7 +83,7 @@ void HybridAllocator::init_add_free(uint64_t offset, uint64_t length) {
 void HybridAllocator::init_rm_free(uint64_t offset, uint64_t length) {
     if (!length) return;
     std::lock_guard l(lock_);
-    clab_assert(offset + length <= uint64_t(device_size));
+    cxxlab_assert(offset + length <= uint64_t(device_size));
     if (!_remove_from_tree(offset, length))
         child_->init_rm_free(offset, length);
 }

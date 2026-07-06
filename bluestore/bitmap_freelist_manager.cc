@@ -73,7 +73,7 @@ BitmapFreelistManager::BitmapFreelistManager(
 int BitmapFreelistManager::create(
     uint64_t new_size, uint64_t granularity,
     Transaction txn) {
-    clab_assert(is_power_of_2(granularity));
+    cxxlab_assert(is_power_of_2(granularity));
     bytes_per_block_ = granularity;
     size_ = new_size & ~(bytes_per_block_ - 1);
     blocks_per_key_ = 128;
@@ -144,12 +144,12 @@ bool BitmapFreelistManager::enumerate_next(
     if (enumerate_offset_ == 0 && enumerate_bl_pos_ == 0) {
         enumerate_p_ = kvdb->get_iterator(bitmap_prefix_);
         enumerate_p_->lower_bound(std::string());
-        clab_assert(enumerate_p_->valid());
+        cxxlab_assert(enumerate_p_->valid());
         std::string k = enumerate_p_->key();
         enumerate_offset_ = key_decode_u64(k.data());
         enumerate_bl_ = enumerate_p_->value();
-        clab_assert(enumerate_offset_ == 0);
-        clab_assert(get_next_set_bit(enumerate_bl_, 0) == 0);
+        cxxlab_assert(enumerate_offset_ == 0);
+        cxxlab_assert(get_next_set_bit(enumerate_bl_, 0) == 0);
     }
 
     if (enumerate_offset_ >= size_) {
@@ -230,8 +230,8 @@ void BitmapFreelistManager::release(
 void BitmapFreelistManager::_xor(
     uint64_t offset, uint64_t length,
     Transaction txn) {
-    clab_assert((offset & block_mask_) == offset);
-    clab_assert((length & block_mask_) == length);
+    cxxlab_assert((offset & block_mask_) == offset);
+    cxxlab_assert((length & block_mask_) == length);
 
     uint64_t first_key = offset & key_mask_;
     uint64_t last_key = (offset + length - 1) & key_mask_;
@@ -276,7 +276,7 @@ void BitmapFreelistManager::_xor(
             first_key += bytes_per_key_;
         }
 
-        clab_assert(first_key == last_key);
+        cxxlab_assert(first_key == last_key);
         {
             bufferptr p(blocks_per_key_ >> 3);
             p.zero();
@@ -340,16 +340,16 @@ void BitmapFreelistManager::_load_from_db(KeyValueDB *kvdb) {
         std::string k = it->key();
         bufferlist bl = it->value();
         if (k == "bytes_per_block") {
-            clab_assert(bl.length() == sizeof(bytes_per_block_));
+            cxxlab_assert(bl.length() == sizeof(bytes_per_block_));
             std::memcpy(&bytes_per_block_, bl.c_str(), sizeof(bytes_per_block_));
         } else if (k == "blocks") {
-            clab_assert(bl.length() == sizeof(blocks_));
+            cxxlab_assert(bl.length() == sizeof(blocks_));
             std::memcpy(&blocks_, bl.c_str(), sizeof(blocks_));
         } else if (k == "size") {
-            clab_assert(bl.length() == sizeof(size_));
+            cxxlab_assert(bl.length() == sizeof(size_));
             std::memcpy(&size_, bl.c_str(), sizeof(size_));
         } else if (k == "blocks_per_key") {
-            clab_assert(bl.length() == sizeof(blocks_per_key_));
+            cxxlab_assert(bl.length() == sizeof(blocks_per_key_));
             std::memcpy(&blocks_per_key_, bl.c_str(), sizeof(blocks_per_key_));
         }
         it->next();

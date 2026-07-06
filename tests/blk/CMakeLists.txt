@@ -4,7 +4,7 @@ function(add_blk_test name source)
     target_link_libraries(${name}
         PRIVATE
             blk
-            clab_test_helpers
+            cxxlab_test_helpers
             GTest::gtest_main
     )
     add_test(NAME ${name} COMMAND ${name})

@@ -5,7 +5,7 @@
 
 #include "common/error.h"
 
-using clab::cpp_strerror;
+using TOPNSPC::cpp_strerror;
 
 TEST(ErrorTest, KnownPositiveErrno) {
     std::string s = cpp_strerror(EINVAL);
