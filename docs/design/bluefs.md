@@ -1,5 +1,7 @@
 # BlueFS — 用户态文件系统
 
+> **实现状态**: 已实现（Phase 1.1–1.11，55 tests）
+
 ## 1. 概述
 
 BlueFS 是一个为 RocksDB 设计的轻量级用户态文件系统，运行在裸块设备之上，不依赖内核 VFS。它替代了传统文件系统（如 XFS/ext4）作为 RocksDB 的存储后端，消除了双文件系统（RocksDB on XFS on BlueStore）的路径开销。
@@ -7,7 +9,7 @@ BlueFS 是一个为 RocksDB 设计的轻量级用户态文件系统，运行在�
 ### 1.1 为什么要 BlueFS
 
 ```plaintext
-传统方案:                        BlueStore 方案:
+传统方案：                        BlueStore 方案：
   Application                      Application
        │                                │
        ▼                                ▼
@@ -53,16 +55,16 @@ BlueFS 消除了 **XFS → Block Layer → BlueStore** 之间的上下文切换�
 
 BlueFS 通常内嵌在 BlueStore 中，RocksDB 将其 WAL 和 SST 文件存放在 BlueFS 上。两者共享同一块设备时，通过 `bluefs_shared_alloc_context_t` 共用 Allocator：
 
-```
-         BlueStore                     BlueFS
-            │                            │
+```plaintext
+         BlueStore                    BlueFS
+            │                           │
   ┌─────────┴──────────┐      ┌─────────┴──────────┐
-  │  Allocator         │◄────►│  Allocator          │
-  │  (主设备, 共享)     │      │  (主设备, 共享)      │
+  │  Allocator         │◄────►│  Allocator         │
+  │  (primary, shared) │      │  (primary, shared) │
   └────────────────────┘      └────────────────────┘
-            │                            │
-         BlockDevice                 BlockDevice
-         (主设备)                     (WAL/DB/主设备)
+            │                           │
+         BlockDevice                BlockDevice
+         (主设备)                    (WAL/DB/主设备)
 ```
 
 ---
@@ -74,30 +76,30 @@ BlueFS 通常内嵌在 BlueStore 中，RocksDB 将其 WAL 和 SST 文件存放�
 ```plaintext
 ┌──────────────────────────────────────────────────────────────────┐
 │                           BlueFS                                 │
-│                                                                   │
+│                                                                  │
 │  ┌────────────────────────────────────────────────────────┐      │
-│  │                  In-Memory State                        │      │
-│  │  ┌─────────────┐  ┌──────────────┐  ┌───────────────┐ │      │
+│  │                  In-Memory State                       │      │
+│  │  ┌──────────────┐  ┌──────────────┐  ┌───────────────┐ │      │
 │  │  │ nodes.dir_map│  │nodes.file_map│  │ dirty.files   │ │      │
 │  │  │ (dirname→Dir)│  │ (ino→File)   │  │ (seq→files)   │ │      │
-│  │  └─────────────┘  └──────────────┘  └───────────────┘ │      │
+│  │  └──────────────┘  └──────────────┘  └───────────────┘ │      │
 │  └────────────────────────────────────────────────────────┘      │
-│                                                                   │
+│                                                                  │
 │  ┌──────────────────────┐  ┌────────────────────────────────┐    │
 │  │   Log/Journal        │  │  RocksDBBlueFSVolumeSelector   │    │
-│  │   - bluefs_fnode_t   │  │  - 按 RocksDB 级别智能放置     │    │
-│  │   - seq, transaction │  │  - 按设备容量比例分配           │    │
-│  │   - dirty tracking   │  │  - DB 满时溢出到 Slow          │    │
-│  │   - 异步压缩          │  │                                │    │
+│  │   - bluefs_fnode_t   │  │  - Place by RocksDB level      │    │
+│  │   - seq, transaction │  │  - Alloc by dev capacity ratio │    │
+│  │   - dirty tracking   │  │  - Spill to Slow when DB full  │    │
+│  │   - async compact    │  │                                │    │
 │  └──────────────────────┘  └────────────────────────────────┘    │
-│                                                                   │
+│                                                                  │
 │  ┌──────────────────────── Per-Device Layer ──────────────────┐  │
 │  │                                                            │  │
-│  │  BDEV_WAL (0)    BDEV_DB (1)    BDEV_SLOW (2)             │  │
-│  │  ┌──────────┐   ┌──────────┐   ┌──────────┐               │  │
-│  │  │Allocator │   │Allocator │   │Allocator │               │  │
-│  │  │BlockDev  │   │BlockDev  │   │BlockDev  │               │  │
-│  │  └──────────┘   └──────────┘   └──────────┘               │  │
+│  │  BDEV_WAL (0)    BDEV_DB (1)    BDEV_SLOW (2)              │  │
+│  │  ┌──────────┐   ┌──────────┐   ┌──────────┐                │  │
+│  │  │Allocator │   │Allocator │   │Allocator │                │  │
+│  │  │BlockDev  │   │BlockDev  │   │BlockDev  │                │  │
+│  │  └──────────┘   └──────────┘   └──────────┘                │  │
 │  └────────────────────────────────────────────────────────────┘  │
 └──────────────────────────────────────────────────────────────────┘
 ```
@@ -106,7 +108,7 @@ BlueFS 通常内嵌在 BlueStore 中，RocksDB 将其 WAL 和 SST 文件存放�
 
 #### 2.2.1 超级块 (`bluefs_super_t`)
 
-存储在 DB 设备偏移 `4096`（第 2 个 4KB 块），第一个 4KB 块保留给块设备标签：
+存储在 DB 设备偏移 `4096`（第 2 个 4KB 块），第一个 4KB 块保留给块设备标签。超级块使用 CRC-32C 校验，`_write_super` / `_read_super` 在写入和读取时分别计算和验证校验和：
 
 ```cpp
 struct bluefs_super_t {
@@ -117,8 +119,6 @@ struct bluefs_super_t {
     bluefs_fnode_t log_fnode;        // 日志文件的 fnode (ino = 1)
 };
 ```
-
-> **TBD**: CRC32 校验将在超级块写入路径（Phase 1.3）中添加。
 
 #### 2.2.2 物理 extent (`bluefs_extent_t`)
 
@@ -188,9 +188,7 @@ struct bluefs_transaction_t {
 };
 ```
 
-> **TBD**: CRC32 校验和块边界对齐将在日志写入路径（Phase 1.8）中添加。
-
-> **cxxlab 简化**: 移除 `OP_ALLOC_ADD`/`OP_ALLOC_RM`（已废弃的历史操作）。
+> **cxxlab 简化**: 移除 `OP_ALLOC_ADD`/`OP_ALLOC_RM`（已废弃的历史操作）。日志写入路径使用 CRC-32C 校验和块边界对齐，确保 crash consistency。
 
 ### 2.3 设备管理
 
@@ -539,8 +537,8 @@ mkfs(osd_uuid)
   │
   ├── 2. 初始化分配器
   │     for each device:
-  │       if is_shared: reuse shared_alloc->allocator
-  │       else:         alloc[dev] = Allocator::create("bitmap", size, alloc_size)
+  │     if is_shared: reuse shared_alloc->allocator
+  │     else:         alloc[dev] = Allocator::create("avl", size, alloc_size)
   │
   ├── 3. 创建日志文件
   │     log_file = new File(ino = 1)
@@ -569,12 +567,12 @@ mount()
   ├── 2. 读取超级块
   │     read(BDEV_DB, 4096, 4096 → super_bl)
   │     decode super
-  │     // TBD: CRC32 校验
+  │     verify CRC-32C
   │
   ├── 3. 初始化分配器
   │     for each device:
-  │       if is_shared: use shared_alloc->allocator
-  │       else:         create Allocator("bitmap", size, alloc_size)
+  │     if is_shared: use shared_alloc->allocator
+  │     else:         create Allocator("avl", size, alloc_size)
   │
   ├── 4. 设置卷选择器
   │     初始化 RocksDBBlueFSVolumeSelector
@@ -585,7 +583,7 @@ mount()
   │     for each extent in log_fnode.extents:
   │       for each transaction block:
   │         read block → decode OPs
-  │         // TBD: CRC32 校验
+  │         verify CRC-32C
   │         switch op:
   │           OP_DIR_CREATE:  nodes_.dir_map[name] = new Dir
   │           OP_DIR_LINK:    dir->file_map[name] = file
@@ -754,7 +752,7 @@ _compact_log_async()
   │
   ├── _compact_log_dump_metadata()
   │     // 遍历 nodes_.dir_map + nodes_.file_map
-  │     // 收集:
+  │     // 收集：
   │     //   - 所有目录的 OP_DIR_CREATE
   │     //   - 所有文件条目的 OP_DIR_LINK
   │     //   - 所有文件的 OP_FILE_UPDATE（完整 fnode，不是增量）
@@ -783,7 +781,7 @@ _compact_log_async()
   │
   │  ─── Step 5: 写入新日志内容 ───
   │
-  ├── bdev->write(BDEV_DB, new_fnode 起始偏移, starter_bl + compacted_meta_bl)
+  ├── bdev->write(BDEV_DB, new_fnode 起始偏移，starter_bl + compacted_meta_bl)
   │
   │  ─── Step 6: 更新超级块 ───
   │
@@ -825,11 +823,11 @@ _allocate(uint8_t dev_id, uint64_t len, bluefs_fnode_t *node)
   │
   ├── 4. alloc->allocate(len, alloc_size, hint, &extents)
   │
-  ├── 5. if 分配失败 && 允许设备降级:
+  ├── 5. if 分配失败 && 允许设备降级：
   │     // WAL → DB → Slow 逐级回退
   │     dev_id++ → retry
   │
-  ├── 6. if 共享设备 && 分配失败且有 cooldown 机制:
+  ├── 6. if 共享设备 && 分配失败且有 cooldown 机制：
   │     设置 cooldown_deadline 避免重试过密
   │     // 共享设备分配的 cooldown：若连续失败，
   │     // 等待 bluefs_failed_shared_alloc_cooldown 秒后再试
@@ -860,7 +858,7 @@ _allocate(uint8_t dev_id, uint64_t len, bluefs_fnode_t *node)
 
 ### 5.2 锁层级
 
-```
+```plaintext
          │ W  │ L  │ N  │ D  │ F
     ─────┼────┼────┼────┼────┼────
     W   │    │ >  │ >  │ >  │ >
@@ -885,269 +883,7 @@ _allocate(uint8_t dev_id, uint64_t len, bluefs_fnode_t *node)
 
 BlueRocksEnv 是连接 BlueFS 和 RocksDB 的桥梁——它实现 `rocksdb::Env` 接口，将 RocksDB 的所有文件操作路由到 BlueFS，而将线程管理、定时等非文件操作委托给 POSIX `Env::Default()`。
 
-### 6.1 架构
-
-```cpp
-class BlueRocksEnv : public rocksdb::EnvWrapper {
-public:
-    explicit BlueRocksEnv(BlueFS *fs);
-
-    // Override: 文件操作 → BlueFS
-    Status NewSequentialFile(...) override;
-    Status NewRandomAccessFile(...) override;
-    Status NewWritableFile(...) override;
-    Status FileExists(...) override;
-    Status GetChildren(...) override;
-    Status DeleteFile(...) override;
-    Status CreateDir(...) override;
-    Status DeleteDir(...) override;
-    Status GetFileSize(...) override;
-    Status RenameFile(...) override;
-    // ...
-
-private:
-    BlueFS *fs_;  // 指向 BlueFS 实例
-};
-```
-
-### 6.2 路径分发规则
-
-```
-NewSequentialFile("db/000123.sst")
-    │
-    ├── 首字符是 '/' ?
-    │    YES → target()->NewSequentialFile(...)  // 绝对路径 → POSIX Env
-    │
-    └── NO  → split("db/000123.sst")
-                │
-                ├── dir = "db"
-                ├── file = "000123.sst"
-                └── fs_->open_for_read("db", "000123.sst", &h, false)
-                      → BlueRocksSequentialFile(fs_, h)
-```
-
-**关键规则**:
-- 绝对路径（以 `/` 开头）→ 转发到 POSIX `Env::Default()`，支持 `db_paths`、`wal_dir` 等指向外部目录
-- 相对路径 → `split()` 解析为 `(dirname, filename)` 对，调用 BlueFS
-
-**`split()` 辅助函数**:
-
-```cpp
-// "db/000123.sst" → (dir="db", file="000123.sst")
-// "db/slow/000456.sst" → (dir="db/slow", file="000456.sst")
-// "CURRENT" → (dir="", file="CURRENT")
-std::pair<std::string_view, std::string_view> split(const std::string &fn);
-```
-
-**`err_to_status()` 错误码转换**:
-
-```cpp
-rocksdb::Status err_to_status(int r) {
-    switch (r) {
-    case 0:        return Status::OK();
-    case -ENOENT:  return Status::NotFound();
-    case -EINVAL:  return Status::InvalidArgument();
-    default:       return Status::IOError(strerror(-r));
-    }
-}
-```
-
-### 6.3 文件句柄类型
-
-BlueRocksEnv 定义了 4 个内部类，将 BlueFS 句柄包装为 RocksDB 的抽象文件接口：
-
-#### 6.3.1 BlueRocksSequentialFile — 顺序读
-
-```cpp
-class BlueRocksSequentialFile : public rocksdb::SequentialFile {
-    BlueFS::FileReader *h;
-
-    Status Read(size_t n, Slice *result, char *scratch) override {
-        int64_t r = fs_->read(h, h->buf.pos, n, nullptr, scratch);
-        *result = Slice(scratch, r);
-        return Status::OK();
-    }
-
-    Status Skip(uint64_t n) override {
-        h->buf.pos += n;  // 推进逻辑偏移
-        return Status::OK();
-    }
-};
-```
-
-| RocksDB 方法 | BlueFS 调用 | 说明 |
-| --- | --- | --- |
-| `Read(n)` | `fs_->read(h, pos, n, scratch)` | 从当前 buffer 位置读取 |
-| `Skip(n)` | `h->buf.pos += n` | 推进逻辑偏移，无 IO |
-| `InvalidateCache(off, len)` | `h->buf.invalidate()` + `fs_->invalidate_cache()` | 清除缓存 |
-
-#### 6.3.2 BlueRocksRandomAccessFile — 随机读
-
-```cpp
-class BlueRocksRandomAccessFile : public rocksdb::RandomAccessFile {
-    BlueFS::FileReader *h;
-
-    Status Read(uint64_t offset, size_t n, Slice *result,
-                char *scratch) const override {
-        int64_t r = fs_->read_random(h, offset, n, scratch);
-        *result = Slice(scratch, r);
-        return Status::OK();
-    }
-
-    size_t GetUniqueId(char *id, size_t max_size) const override {
-        return snprintf(id, max_size, "%016llx",
-                        (unsigned long long)h->file->fnode.ino);
-    }
-
-    void Hint(AccessPattern pattern) override {
-        if (pattern == RANDOM)
-            h->buf.max_prefetch = 4096;
-        else if (pattern == SEQUENTIAL)
-            h->buf.max_prefetch = cfg_.max_prefetch;
-    }
-};
-```
-
-| RocksDB 方法 | BlueFS 调用 | 说明 |
-| --- | --- | --- |
-| `Read(offset, n)` | `fs_->read_random(h, offset, n, scratch)` | 直接随机读，不经过缓冲 |
-| `GetUniqueId()` | `h->file->fnode.ino` | 返回 inode 编号作为文件唯一 ID |
-| `Prefetch(offset, n)` | `fs_->read(h, offset, n)` | 触发 BlueFS 预取缓存 |
-| `Hint(pattern)` | 调整 `max_prefetch` | 随机 → 4KB，顺序 → 配置值 |
-
-#### 6.3.3 BlueRocksWritableFile — 顺序写
-
-```cpp
-class BlueRocksWritableFile : public rocksdb::WritableFile {
-    BlueFS::FileWriter *h;
-
-    Status Append(const Slice &data) override {
-        fs_->append_try_flush(h, data.data(), data.size());
-        return Status::OK();
-    }
-
-    Status Close() override {
-        fs_->fsync(h);
-        // 尾部截断到实际写入位置
-        fs_->truncate(h, h->pos);
-        return Status::OK();
-    }
-
-    Status Sync() override {
-        fs_->fsync(h);
-        return Status::OK();
-    }
-
-    uint64_t GetFileSize() override {
-        return h->file->fnode.size + h->buffer.length();
-    }
-
-    size_t GetUniqueId(char *id, size_t max_size) const override {
-        return snprintf(id, max_size, "%016llx",
-                        (unsigned long long)h->file->fnode.ino);
-    }
-};
-```
-
-| RocksDB 方法 | BlueFS 调用 | 说明 |
-| --- | --- | --- |
-| `Append(data)` | `fs_->append_try_flush(h, data, len)` | 追加到 buffer，超阈值时自动刷写 |
-| `Flush()` | `fs_->flush(h)` | 刷写缓冲数据 |
-| `Sync()` | `fs_->fsync(h)` | 刷写数据 + sync 元数据日志 |
-| `Close()` | `fs_->fsync()` + `fs_->truncate()` | 写入完成，截断未使用的预分配空间 |
-| `GetFileSize()` | `fnode->size + buffer.length()` | 包括未刷写的数据 |
-| `GetUniqueId()` | `fnode.ino` | inode 编号 |
-| `SetWriteLifeTimeHint(hint)` | `h->write_hint = hint` | 传递给 BlueFS 分配 hint |
-| `RangeSync(off, n)` | `fs_->flush_range(h, off, n)` | 刷写指定字节范围 |
-| `Allocate(off, len)` | `fs_->preallocate(h->file, off, len)` | 预分配磁盘空间 |
-
-#### 6.3.4 BlueRocksDirectory — 目录
-
-```cpp
-class BlueRocksDirectory : public rocksdb::Directory {
-    Status Fsync() override {
-        fs_->sync_metadata(false);  // flush BlueFS log
-        return Status::OK();
-    }
-};
-```
-
-### 6.4 BlueRocksEnv 操作实现
-
-#### 6.4.1 文件创建
-
-| RocksDB 调用 | 实现 |
-| --- | --- |
-| `NewSequentialFile(fname)` | `split(fname)` → `fs_->open_for_read(dir, file, &h, false)` |
-| `NewRandomAccessFile(fname)` | `split(fname)` → `fs_->open_for_read(dir, file, &h, true)` |
-| `NewWritableFile(fname)` | `split(fname)` → `fs_->open_for_write(dir, file, &h, false)` |
-| `ReuseWritableFile(old, new)` | `fs_->rename(old_dir, old_file, new_dir, new_file)` → `fs_->open_for_write(dir, file, &h, true)` |
-
-#### 6.4.2 目录与文件状态
-
-| RocksDB 调用 | BlueFS 调用 |
-| --- | --- |
-| `FileExists(fname)` | `fs_->stat(dir, file, nullptr, nullptr)` |
-| `GetChildren(dir)` | `fs_->readdir(dir, &result)` |
-| `DeleteFile(fname)` | `fs_->unlink(dir, file)` + `fs_->sync_metadata(false)` |
-| `CreateDir(dirname)` | `fs_->mkdir(dirname)` |
-| `CreateDirIfMissing(dirname)` | `fs_->mkdir(dirname)` (忽略 `-EEXIST`) |
-| `DeleteDir(dirname)` | `fs_->rmdir(dirname)` |
-| `GetFileSize(fname)` | `fs_->stat(dir, file, &file_size, nullptr)` |
-| `RenameFile(src, target)` | `fs_->rename(old_dir, old_file, new_dir, new_file)` + `fs_->sync_metadata(false)` |
-| `LinkFile(src, target)` | 不实现（硬链接不支持），返回 `Status::NotSupported()` |
-| `LockFile(fname)` | `fs_->lock_file(dir, file, &lock)` |
-| `UnlockFile(lock)` | `fs_->unlock_file(lock)` |
-
-#### 6.4.3 日志与目录
-
-| RocksDB 调用 | 实现 |
-| --- | --- |
-| `NewLogger(fname)` | 忽略文件名，返回 `CephRocksdbLogger` → 日志输出到 `dout` 系统 |
-| `GetTestDirectory()` | 返回唯一名称如 `"temp_1"`、`"temp_2"` |
-| `GetAbsolutePath(path)` | 返回 `"/" + path`（BlueFS 路径无根，加 `/` 满足 RocksDB 预期） |
-
-### 6.5 CephRocksdbLogger
-
-RocksDB 内部日志通过 `NewLogger()` 创建的自定义 Logger 输出：
-
-```cpp
-class CephRocksdbLogger : public rocksdb::Logger {
-    void Logv(const InfoLogLevel log_level,
-              const char *format, va_list ap) override {
-        int v = NUM_INFO_LOG_LEVELS - log_level - 1;
-        char buf[65536];
-        vsnprintf(buf, sizeof(buf), format, ap);
-        // 输出到 dout 系统
-    }
-};
-```
-
-### 6.6 可用性保证 (EnvMirror)
-
-在开发和测试阶段，可以使用 `rocksdb::EnvMirror` 将操作同时发送到 BlueRocksEnv 和 POSIX Env，验证两者行为一致：
-
-```cpp
-bool mirror = config.enable_env_mirror;
-if (mirror) {
-    auto *blue_env = new BlueRocksEnv(bluefs);
-    auto *posix_env = rocksdb::Env::Default();
-    env = new rocksdb::EnvMirror(posix_env, blue_env, false, true);
-} else {
-    env = new BlueRocksEnv(bluefs);
-}
-```
-
-### 6.7 总结
-
-| 组件 | 职责 | 文件 |
-| --- | --- | --- |
-| `BlueRocksEnv` | 实现 `rocksdb::Env`，路由文件操作到 BlueFS | `BlueRocksEnv.h/cc` |
-| `BlueRocksSequentialFile` | 顺序读包装 | `BlueRocksEnv.cc` (内部类) |
-| `BlueRocksRandomAccessFile` | 随机读包装 | `BlueRocksEnv.cc` (内部类) |
-| `BlueRocksWritableFile` | 顺序写包装 | `BlueRocksEnv.cc` (内部类) |
-| `BlueRocksDirectory` | 目录 Fsync 包装 | `BlueRocksEnv.cc` (内部类) |
-| `CephRocksdbLogger` | RocksDB 日志输出到 `dout` | `RocksDBStore.cc` |
+详细设计见独立文档：[blue-rocks-env.md](blue-rocks-env.md)。
 
 ---
 
@@ -1175,6 +911,7 @@ if (mirror) {
 | 不移除 OP_JUMP | 异步压缩的核心依赖，不可或缺 |
 | 与 BlueStore 共享 Allocator | 避免空间分区浪费，是本设计的核心优势 |
 | 每设备独立 Allocator | 独占设备（WAL）使用独立分配器，共享设备使用 BlueStore 的分配器 |
+| 使用 AvlAllocator 而非 BitmapAllocator | BitmapAllocator 的 L2 粒度为 512MB，小测试设备（8MB）上 `init_rm_free` 任意范围都会清空首个 L2 bit，导致全设备误标记为已分配。AvlAllocator 无最小粒度限制，适合所有设备尺寸 |
 
 ### 7.3 已知待办
 
@@ -1188,9 +925,9 @@ if (mirror) {
 
 - Ceph source: `src/os/bluestore/BlueFS.h` / `.cc`
 - Ceph source: `src/os/bluestore/bluefs_types.h` / `.cc`
-- Ceph source: `src/os/bluestore/BlueRocksEnv.h` / `.cc`
 - Ceph source: `src/os/bluestore/BlueStore.h` / `.cc` (BlueFS 集成部分)
-- Ceph source: `src/kv/RocksDBStore.h` / `.cc` (CephRocksdbLogger)
-- 本项目 `docs/design/block-device.md`: 块设备抽象层设计
-- 本项目 `docs/design/allocator.md`: Allocator 设计
-- 本项目 `docs/design/bluestore.md`: BlueStore 设计
+- 本项目 [docs/design/overview.md](overview.md): 架构总览
+- 本项目 [docs/design/block-device.md](block-device.md): 块设备抽象层设计
+- 本项目 [docs/design/allocator.md](allocator.md): Allocator 设计
+- 本项目 [docs/design/blue-rocks-env.md](blue-rocks-env.md): BlueRocksEnv 设计
+- 本项目 [docs/design/bluestore.md](bluestore.md): BlueStore 设计

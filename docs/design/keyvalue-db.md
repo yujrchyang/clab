@@ -1,25 +1,27 @@
 # kv — Key-Value Storage Abstraction Layer
 
+> **实现状态**: 已实现（80 tests，RocksDBStore + MemDB + MergeOperator）
+
 ## 1. 需求分析
 
 ### 1.1 背景
 
-cxxlab 需要在 block device 层之上实现一个类 BlueStore 的对象存储引擎。Ceph BlueStore 依赖一个 KV 存储作为元数据与状态持久化引擎，承担以下职责：
+cxxlab 需要在 block device 层之上实现一个类 BlueStore 的对象存储引擎。Ceph BlueStore 依赖一个 KV 存储作为元数据与状态持久化引擎，承担以下职责（完整的前缀定义及实现状态见 [overview.md](overview.md) §4）：
 
-| 数据类别 | KV Prefix | 内容 |
-| --- | --- | --- |
-| 超级块 | `PREFIX_SUPER` ("S") | nid/blobid 计数器、分配参数 |
-| 统计信息 | `PREFIX_STAT` ("T") | 全局/每池 statfs 数据 |
-| 集合 (Collection) | `PREFIX_COLL` ("C") | 集合名 → cnode_t |
-| 对象元数据 (Onode) | `PREFIX_OBJ` ("O") | 对象名 → onode_t（含 extent map） |
-| Omap (旧) | `PREFIX_OMAP` ("M") | nid + key → value |
-| Omap (按 PG) | `PREFIX_PERPG_OMAP` ("p") | pool + hash + nid + key → value |
-| Omap (按 pool) | `PREFIX_PERPOOL_OMAP` ("m") | pool + nid + key → value |
-| Omap (meta PG) | `PREFIX_PGMETA_OMAP` ("P") | meta PG 的 omap |
-| Deferred WAL | `PREFIX_DEFERRED` ("L") | seq → deferred_transaction_t |
-| Freelist (extent) | `PREFIX_ALLOC` ("B") | offset → length |
-| Freelist (bitmap) | `PREFIX_ALLOC_BITMAP` ("b") | 位图分配元数据 |
-| 共享 Blob | `PREFIX_SHARED_BLOB` ("X") | sb_id → shared_blob_t |
+| 数据类别 | KV Prefix | 内容 | 实现状态 |
+| --- | --- | --- | --- |
+| 超级块 | `PREFIX_SUPER` ("S") | nid/blobid 计数器、分配参数 | 已实现 |
+| 统计信息 | `PREFIX_STAT` ("T") | 全局/每池 statfs 数据 | 计划中 |
+| 集合 (Collection) | `PREFIX_COLL` ("C") | 集合名 → cnode_t | 已实现 |
+| 对象元数据 (Onode) | `PREFIX_OBJ` ("O") | 对象名 → onode_t（含 extent map） | 计划中 |
+| Omap (旧) | `PREFIX_OMAP` ("M") | nid + key → value | 不实现 |
+| Omap (按 PG) | `PREFIX_PERPG_OMAP` ("p") | pool + hash + nid + key → value | 不实现 |
+| Omap (按 pool) | `PREFIX_PERPOOL_OMAP` ("m") | pool + nid + key → value | 不实现 |
+| Omap (meta PG) | `PREFIX_PGMETA_OMAP` ("P") | meta PG 的 omap | 不实现 |
+| Deferred WAL | `PREFIX_DEFERRED` ("L") | seq → deferred_transaction_t | 计划中 |
+| Freelist (extent) | `PREFIX_ALLOC` ("B") | offset → length | 已实现 |
+| Freelist (bitmap) | `PREFIX_ALLOC_BITMAP` ("b") | 位图分配元数据 | 已实现 |
+| 共享 Blob | `PREFIX_SHARED_BLOB` ("X") | sb_id → shared_blob_t | 不实现 |
 
 ### 1.2 约束条件
 
@@ -548,3 +550,14 @@ auto db = KeyValueDB::create("memdb", "/tmp/unused", {});
 db->create_and_open(std::cerr);
 // 所有操作与 RocksDB 模式语义完全一致
 ```
+
+## 7. 参考
+
+- Ceph source: `src/kv/KeyValueDB.h` / `.cc`
+- Ceph source: `src/kv/RocksDBStore.h` / `.cc`
+- Ceph source: `src/kv/MemDB.h` / `.cc`
+- 本项目 [docs/design/overview.md](overview.md): 架构总览
+- 本项目 `kv/key_value_db.h`: KeyValueDB 抽象层
+- 本项目 `kv/rocksdb/rocksdb_store.h`: RocksDBStore 后端
+- 本项目 `kv/mem/mem_db.h`: MemDB 后端
+- 本项目 `kv/merge_op/`: MergeOperator 实现

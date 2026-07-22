@@ -1,5 +1,7 @@
 # BlueStore — 单机键值存储引擎
 
+> **实现状态**: 设计完成，Phase 3 开发中（§3.3 `pextent_t` 已实现；§3.1–3.2, §3.4–3.10 数据结构及 §4–7 引擎逻辑尚未实现）
+
 ## 1. 概述
 
 BlueStore 是一个直接管理原始块设备的单机键值存储引擎，绕过了传统本地文件系统（如 XFS/ext4）。其核心思路是将**元数据**存放在 KV 存储（RocksDB）中，而**数据**直接写入裸块设备。
@@ -7,27 +9,28 @@ BlueStore 是一个直接管理原始块设备的单机键值存储引擎，绕�
 ### 1.1 分层架构
 
 ```plaintext
-┌─────────────────────────────────────────────────────────────────┐
+┌──────────────────────────────────────────────────────────────────┐
 │                     BlueStore (ObjectStore)                      │
-│                                                                   │
-│  Object 接口: read / write / zero / remove / clone / setattrs    │
-│  Collection 接口: list_collections / collection_list              │
-│  Transaction 接口: queue_transactions                             │
+│                                                                  │
+│  Object API: read / write / zero / remove / clone / setattrs     │
+│  Collection API: list_collections / collection_list              │
+│  Transaction API: queue_transactions                             │
 ├─────────────────┬──────────────────┬─────────────────────────────┤
-│   KV 层         │   Allocator      │   Block Device              │
+│   KV            │   Allocator      │   Block Device              │
 │  (RocksDBStore) │  (Avl/Bitmap)    │  (KernelDevice + libaio)    │
 └─────────────────┴──────────────────┴─────────────────────────────┘
 ```
 
 ### 1.2 依赖组件
 
-| 组件 | 角色 | 对应 cxxlab 实现 |
-| --- | --- | --- |
-| `KeyValueDB` | 元数据持久化 | `kv/rocksdb_store.h` (RocksDBStore) |
-| `FreelistManager` | 分配状态持久化 | `bluestore/bitmap_freelist_manager.h` |
-| `Allocator` | 运行时内存分配决策 | `bluestore/{avl,bitmap,hybrid}_allocator.h` |
-| `BlockDevice` | 块设备读写 | `blk/kernel_device.h` (libaio) |
-| `BlueFS` | BlueStore 内部日志与元数据文件系统 | （暂不实现，后续整合） |
+| 组件 | 角色 | 对应 cxxlab 实现 | 状态 |
+| --- | --- | --- | --- |
+| `KeyValueDB` | 元数据持久化 | `kv/rocksdb_store.h` (RocksDBStore) | 已实现 |
+| `FreelistManager` | 分配状态持久化 | `bluestore/bitmap_freelist_manager.h` | 已实现 |
+| `Allocator` | 运行时内存分配决策 | `blk/{avl,bitmap,hybrid}_allocator.h` | 已实现 |
+| `BlockDevice` | 块设备读写 | `blk/kernel_device.h` (libaio) | 已实现 |
+| `BlueFS` | BlueStore 内部日志与元数据文件系统 | `bluestore/bluefs.h` | 已实现 |
+| `BlueRocksEnv` | RocksDB 文件操作适配 BlueFS | `bluestore/blue_rocks_env.h` | 已实现 |
 
 ### 1.3 约束条件
 
@@ -38,7 +41,7 @@ BlueStore 是一个直接管理原始块设备的单机键值存储引擎，绕�
 | 压缩 | **暂不实现** |
 | Shared Blob | 不实现（无 clone/snapshot） |
 | Zoned (SMR) | **暂不实现** |
-| Null FM | 暂不实现，始终使用 BitmapFreelistManager |
+| Null FM | 有设计（见 [freelist-manager.md](freelist-manager.md) §6.2），BlueStore 初始版本暂不启用 |
 | 配置方式 | 通过 `BlueStoreConfig` 结构体传入，各参数提供默认值 |
 
 ---
@@ -47,7 +50,7 @@ BlueStore 是一个直接管理原始块设备的单机键值存储引擎，绕�
 
 ### 2.1 前缀定义
 
-BlueStore 将不同类型的数据存储在不同的 RocksDB 前缀（Prefix）下，前缀为单个字符：
+BlueStore 将不同类型的数据存储在不同的 RocksDB 前缀（Prefix）下，前缀为单个字符。完整的前缀定义及实现状态见 [overview.md](overview.md) §4。BlueStore 当前使用的前缀：
 
 | 前缀 | 常量 | 用途 | Key 格式 | Value 类型 |
 | --- | --- | --- | --- | --- |
@@ -55,13 +58,14 @@ BlueStore 将不同类型的数据存储在不同的 RocksDB 前缀（Prefix）�
 | `"C"` | `PREFIX_COLL` | Collection (PG) 元数据 | collection name (string) | `bluestore_cnode_t` |
 | `"O"` | `PREFIX_OBJ` | Object onode + extent shard | 编码的 `ghobject_t` + suffix | `bluestore_onode_t` / shard |
 | `"L"` | `PREFIX_DEFERRED` | 延迟写入 WAL | `u64 seq` | `bluestore_deferred_transaction_t` |
+
 > **cxxlab 简化**: omap 相关前缀（`PREFIX_OMAP`、`PREFIX_PGMETA_OMAP`、`PREFIX_PERPOOL_OMAP`、`PREFIX_PERPG_OMAP`）暂不实现。
 
 ### 2.2 Object Key 编码
 
 Onode key 位于 `PREFIX_OBJ` 下，编码格式保证 lexicographic 排序与 `ghobject_t` 一致：
 
-```
+```plaintext
 [1 byte: shard_id + 0x80]
 [8 bytes: pool_id + 0x8000000000000000]   // big-endian
 [4 bytes: hash (bitwise reversed)]
@@ -80,7 +84,7 @@ Key 前缀固定 13 字节（`ENCODED_KEY_PREFIX_LEN = 1 + 8 + 4`）。
 
 当一个 object 的 extent map 过大时，分片存储到多个 KV 条目。Shard key 以 onode key 为前缀：
 
-```
+```plaintext
 <onode_key> + [4 bytes: u32 offset] + [1 byte: EXTENT_SHARD_SUFFIX = 'x']
 ```
 
@@ -113,6 +117,8 @@ Key 中的 namespace、key、object name 需转义，以保证 lexicographic 排
 
 ## 3. 核心数据结构
 
+> **实现状态说明**: 本节描述的数据结构属于 Phase 3 设计规格。其中 §3.3 `bluestore_pextent_t`（别名 `pextent_t`）**已实现**于 `blk/extent_types.h` + `bluestore/bluestore_types.h`。其余结构（§3.1–3.2, §3.4–3.10）**尚未实现**，将在 Phase 3.1 (`bluestore_types.h/cc`) 中逐步落地。`bluestore_types.h` 当前仅包含 `pextent_t` 别名。
+
 ### 3.1 bluestore_bdev_label_t
 
 块设备标签，存储在设备的首个 4KB 扇区中：
@@ -140,17 +146,24 @@ struct bluestore_cnode_t {
 
 ### 3.3 bluestore_pextent_t
 
-物理 extent，表示磁盘上的连续区间：
+物理 extent，表示磁盘上的连续区间。定义在 `blk/extent_types.h`（Phase 0 重构后从 `bluestore/` 迁移到 `blk/`）。`bluestore_types.h` 中通过别名引用：
 
 ```cpp
-struct bluestore_pextent_t {
-    uint64_t offset = INVALID_OFFSET;   // 磁盘偏移
-    uint32_t length;                    // 长度
+// blk/extent_types.h
+struct pextent_t {
+    uint64_t offset = 0;    // 磁盘偏移
+    uint32_t length = 0;    // 长度
+
+    pextent_t() = default;
+    pextent_t(uint64_t o, uint32_t l) : offset(o), length(l) {}
 };
-using PExtentVector = std::vector<bluestore_pextent_t>;
+using PExtVector = std::vector<pextent_t>;
+
+// bluestore/bluestore_types.h
+using bluestore_pextent_t = pextent_t;  // 别名，保持 API 兼容
 ```
 
-> **cxxlab 简化**: 仅保留 offset + length，不做 denc\_lba/denc\_varint\_lowz 变长编码压缩。
+> **cxxlab 简化**: 仅保留 offset + length，不做 denc\_lba/denc\_varint\_lowz 变长编码压缩。offset 默认值为 `0`（无 `INVALID_OFFSET` 哨兵值，通过 extent 列表空/非空判断有效性）。
 
 ### 3.4 bluestore_blob_t
 
@@ -584,12 +597,10 @@ queue_transactions(collection_ref, transaction_list)
   │     │     按需加载 extent map shard（延迟加载）
   │     │
   │     ├── 3c. 写入策略选择
-  │     │     ┌──────────────────────────────────────────┐
-  │     │     │ 对齐检查: offset % min_alloc_size == 0  │
-  │     │     │ && length <= min_alloc_size 且 fully     │
-  │     │     │ aligned → _do_write_small()              │
-  │     │     │ 否则 → _do_write_big()                   │
-  │     │     └──────────────────────────────────────────┘
+  │     │     - 对齐检查: offset % min_alloc_size == 0
+  │     │       && length <= min_alloc_size 且 fully
+  │     │       aligned → _do_write_small()
+  │     │     - 否则 → _do_write_big()
   │     │
   │     ├── 3d. _do_write_small()
   │     │     // 数据在一个 min_alloc_size block 内
@@ -837,7 +848,7 @@ mount()
 | 压缩 | 支持 (zlib/zstd/lz4/snappy) | **暂不实现** |
 | Shared Blob | 支持克隆引用计数 | 不实现（无 clone/snapshot） |
 | Zoned (SMR) | 支持 | 不实现 |
-| Null FM | 支持 (BlueFS 文件替代 KV) | 不实现 |
+| Null FM | 支持 (BlueFS 文件替代 KV) | 有设计，初始版本暂不启用 |
 | Deferred Write | WAL 延迟写入，减少 IO 延迟 | **初始版本不实现** |
 | PerfCounters | 详细统计 | 保留核心统计 |
 | AdminSocket | 运行时调试 | 移除 |
@@ -846,6 +857,8 @@ mount()
 | Omap | omap 操作 | **暂不实现** |
 | Checksum | CRC32C / XXHASH32 | 支持 (CRC32C 为默认) |
 | Blob 变长编码 | denc_lba / denc_varint_lowz | 使用简单 DENC |
+| BlueFS | 内嵌用户态文件系统 | 已实现（见 [bluefs.md](bluefs.md)） |
+| BlueRocksEnv | RocksDB 文件操作适配 | 已实现（见 [blue-rocks-env.md](blue-rocks-env.md)） |
 
 ### 8.2 关键决策
 
@@ -861,12 +874,10 @@ mount()
 ### 8.3 已知待办
 
 - [ ] Deferred write 路径（后续根据性能需求添加）
-
 - [ ] 压缩
-- [ ] Null FM 模式
+- [ ] Null FM 模式启用（设计已完成，见 freelist-manager.md §6.2）
 - [ ] Omap 操作
-- [ ] BlueFS 集成
-- [ ] Buffer cache
+- [ ] Buffer cache 实现
 - [ ] 碎片整理/GC
 
 ---
@@ -876,7 +887,10 @@ mount()
 - Ceph source: `src/os/bluestore/BlueStore.h` / `.cc`
 - Ceph source: `src/os/bluestore/bluestore_types.h`
 - Ceph source: `src/os/bluestore/bluestore_kv.h`
-- 本项目 `docs/design/keyvalue-db.md`: KV 抽象层设计
-- 本项目 `docs/design/freelist-manager.md`: FreelistManager 设计
-- 本项目 `docs/design/allocator.md`: Allocator 设计
-- 本项目 `docs/design/block-device.md`: 块设备抽象层设计
+- 本项目 [docs/design/overview.md](overview.md): 架构总览
+- 本项目 [docs/design/keyvalue-db.md](keyvalue-db.md): KV 抽象层设计
+- 本项目 [docs/design/freelist-manager.md](freelist-manager.md): FreelistManager 设计
+- 本项目 [docs/design/allocator.md](allocator.md): Allocator 设计
+- 本项目 [docs/design/block-device.md](block-device.md): 块设备抽象层设计
+- 本项目 [docs/design/bluefs.md](bluefs.md): BlueFS 设计
+- 本项目 [docs/design/blue-rocks-env.md](blue-rocks-env.md): BlueRocksEnv 设计

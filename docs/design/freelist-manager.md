@@ -1,5 +1,7 @@
 # FreelistManager — 空闲空间管理器
 
+> **实现状态**: 已实现（15 tests，BitmapFreelistManager + null\_manager 模式）
+
 ## 1. 需求分析
 
 ### 1.1 背景
@@ -37,18 +39,18 @@
 ┌────────────────────────────────────────────────────────────┐
 │                    FreelistManager (abstract)              │
 │  allocate / release / enumerate / create / init / shutdown │
-│  set_null_manager / is_null_manager                       │
+│  set_null_manager / is_null_manager                        │
 └──────────────┬─────────────────────────────────────────────┘
                │ inherit
 ┌──────────────▼─────────────────────────────────────────────┐
 │                 BitmapFreelistManager                      │
-│  基于 bitmap 的实现，数据持久化到 KeyValueDB               │
-│  每个 bit = 1 个 block，1 = allocated, 0 = free            │
-│  每 KV pair 存储 blocks_per_key (默认 128) 个 bit          │
-│  XOR MergeOperator 实现原子性 toggle                       │
+│  bitmap-based, persisted to KeyValueDB                     │
+│  1 bit = 1 block, 1 = allocated, 0 = free                  │
+│  each KV pair stores blocks_per_key (default 128) bits     │
+│  XOR MergeOperator for atomic toggle                       │
 │                                                            │
-│  + null_manager 模式: 运行时 allocate/release 为空操作,    │
-│    分配状态仅存于 Allocator (RAM), 由 BlueFS 文件持久化    │
+│  + null_manager: allocate/release are no-ops at runtime,   │
+│    state kept in Allocator (RAM), persisted by BlueFS      │
 └────────────────────────────────────────────────────────────┘
 ```
 
@@ -106,8 +108,8 @@ for (size_t i = 0; i < rlen; ++i)
 ```plaintext
 |<── first_key ──>|<── middle keys ──>|<── last_key ──>|
 ┌─────────────────┬──────────────────┬─────────────────┐
-│  部分覆盖       │   全量覆盖        │   部分覆盖       │
-│  生成局部 mask  │   all_set_bl     │  生成局部 mask   │
+│  Partial        │   Full           │   Partial        │
+│  gen local mask │   all_set_bl     │  gen local mask  │
 │  merge(txn)     │  merge(txn)      │  merge(txn)      │
 └─────────────────┴──────────────────┴─────────────────┘
 ```
@@ -439,16 +441,16 @@ db->submit_transaction(t);
 
 ### 6.5 构建与命名空间
 
-BitmapFreelistManager 作为 `bluestore` 库的内部组件编译，链接 `kv`（获取 KeyValueDB 接口）和 `common`（bufferlist，assert 等）。
+BitmapFreelistManager 作为 `bluestore` 静态库的组件编译（`libbluestore.a`），链接 `kv`（获取 KeyValueDB 接口）、`blk`（Allocator + extent_types）和 `common`（bufferlist, assert 等）。
 
-命名空间策略：各模块统一在 `TOPNSPC`（即 `cxxlab`）命名空间内，`bufferlist` 等类型可直接使用。
-现有 `kv/`（`namespace kv`）、`blk/`（全局）会在后续对齐，引用时按现状加对应前缀（如 `kv::XorMergeOperator`）。
+命名空间策略：各模块统一在 `TOPNSPC`（即 `cxxlab`）命名空间内，`bufferlist` 等类型可直接使用。Allocator 已从 `bluestore/` 迁移到 `blk/`（Phase 0 重构），引用时使用 `blk/extent_types.h` 和 `blk/allocator.h`。
 
 ## 7. 参考
 
 - Ceph source: `src/os/bluestore/FreelistManager.h` / `.cc`
 - Ceph source: `src/os/bluestore/BitmapFreelistManager.h` / `.cc`
 - Ceph source: `src/os/bluestore/BlueStore.cc` (`_open_fm`, `_txc_finalize_kv`, `_init_alloc`, `_close_fm`)
-- 本项目的 `kv/key_value_db.h`: KeyValueDB 抽象层
-- 本项目的 `kv/merge_op/xor_merge_op.h`: XorMergeOperator
-- `docs/design/keyvalue-db.md`: KV 层设计文档
+- 本项目 [docs/design/overview.md](overview.md): 架构总览
+- 本项目 `kv/key_value_db.h`: KeyValueDB 抽象层
+- 本项目 `kv/merge_op/xor_merge_op.h`: XorMergeOperator
+- 本项目 [docs/design/keyvalue-db.md](keyvalue-db.md): KV 层设计文档

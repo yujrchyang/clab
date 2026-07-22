@@ -1,10 +1,13 @@
 # Allocator — 内存级空闲空间分配器
 
+> **实现状态**: 已实现（73 tests，AvlAllocator + BitmapAllocator + HybridAllocator）
+
 ## 1. 需求分析
 
 ### 1.1 背景
 
-在 BlueStore 单机引擎架构中，`Allocator` 负责**运行时内存中**的空间分配决策，与 `FreelistManager`（持久化分配状态）构成双层空间管理：
+在 BlueStore 单机引擎架构中，`Allocator` 负责**运行时内存中**的空间分配决策，
+与 `FreelistManager`（持久化分配状态）构成双层空间管理：
 
 | 组件 | 角色 | 存储位置 |
 | --- | --- | --- |
@@ -14,16 +17,16 @@
 两者的关系：
 
 ```plaintext
-IO 写入路径:
+IO 写入路径：
   alloc->allocate(want, unit, max_alloc_size, hint, &extents)  // 内存中标记已分配
   → bdev->write(extents, data)                                 // 写入设备
   → _txc_finalize_kv: fm->allocate(off, len, txn)              // 持久化到 KV
 
-回收路径:
+回收路径：
   _txc_release_alloc: alloc->release(txc->released)            // 内存中归还（延迟到所有前置 IO 完成后）
   → _txc_finalize_kv: fm->release(off, len, txn)               // 持久化到 KV
 
-恢复路径:
+恢复路径：
   fm->enumerate_next() → alloc->init_add_free(offset, length)  // 从 FM 重建
 ```
 
@@ -72,14 +75,14 @@ IO 写入路径:
 └──────┬──────────────┬──────────────┬──────────┘
        │              │              │
        ▼              ▼              ▼
-┌─────────────┐ ┌──────────┐ ┌──────────────┐
+┌─────────────┐ ┌──────────┐ ┌───────────────┐
 │ AvlAllocator│ │ Bitmap   │ │HybridAllocator│
 │             │ │Allocator │ │ (Avl + Bitmap)│
-│ offset AVL  │ │ 3级位图  │ │              │
-│ + size AVL  │ │ L0/L1/L2 │ │ spillover    │
-│ first/best  │ │ 64bit op │ │ 机制        │
-│ fit 策略    │ │ 硬件加速 │ │              │
-└─────────────┘ └──────────┘ └──────────────┘
+│ offset AVL  │ │ 3-level  │ │               │
+│ + size AVL  │ │ L0/L1/L2 │ │ spillover     │
+│ first/best  │ │ 64bit op │ │ mechanism     │
+│ fit policy  │ │ HW accel │ │               │
+└─────────────┘ └──────────┘ └───────────────┘
 ```
 
 ### 2.2 AvlAllocator 设计
@@ -116,13 +119,13 @@ struct range_seg_t {
 _allocate(size, unit, &offset, &length):
   1. 获取 max_size = range_size_tree 中的最大区间长度
   2. 若 max_size < size → 降级到 max_size（若 max_size < unit 则返回 ENOSPC）
-  3. 决策路径:
+  3. 决策路径：
      a. force_range_size_alloc 或 max_size < threshold(128K) 或 free_pct < 4%:
         → 直接走 best-fit
-     b. 否则:
+     b. 否则：
         → first-fit: _pick_block_after(cursor, size, unit)
            - 从 cursor 位置开始在 range_tree 中顺序搜索
-           - 搜索上限: max_search_count(100) / max_search_bytes(16MB)
+           - 搜索上限：max_search_count(100) / max_search_bytes(16MB)
            - 超过上限或找不到 → 降级到 best-fit
      c. best-fit: _pick_block_fits(size, unit)
         - 在 range_size_tree 中 lower_bound 找到 >= size 的最小区间
@@ -136,13 +139,13 @@ _allocate(size, unit, &offset, &length):
 _add_to_tree(start, size):
   1. 在 range_tree 中用 upper_bound 找到插入位置 rs_after
   2. 获取前驱节点 rs_before
-  3. 尝试合并:
+  3. 尝试合并：
      - rs_before->end == start → 合并到前驱
      - rs_after->start == end → 合并到后继
      - 两边都满足 → 三合一
      - 都不满足 → 新建节点插入
   4. 插入 size_tree
-  5. 若插入 size_tree 时达到 range_count_cap 上限:
+  5. 若插入 size_tree 时达到 range_count_cap 上限：
      → 小于最小节点长度的 segment 被转移到派生类处理 (HybridAllocator::_spillover_range)
 ```
 
@@ -195,7 +198,7 @@ BitmapAllocator 使用三级位图管理空闲空间，每一层以不同粒度�
 
 | 层级 | 粒度 | 每个 slot 覆盖 | 实现 |
 | --- | --- | --- | --- |
-| L0 | 1 AU = 4 KB | 64 × 4 KB = 256 KB | `vector<uint64_t>`，每 bit 表示一个 AU (1=空闲, 0=已分配) |
+| L0 | 1 AU = 4 KB | 64 × 4 KB = 256 KB | `vector<uint64_t>`，每 bit 表示一个 AU (1=空闲，0=已分配) |
 | L1 | 512 AU ≈ 2 MB | 32 × 2 MB = 64 MB | `vector<uint64_t>`，每 2 bit 编码一个 L0 slotset 状态 |
 | L2 | 32 × 2 MB = 64 MB | 64 × 64 MB = 4 GB | `vector<uint64_t>`，每 1 bit 编码一个 L1 slot 中是否有可用空间 |
 
@@ -212,13 +215,13 @@ BitmapAllocator::allocate(want, unit, max_alloc_size, hint, extents)
   │
   └─ AllocatorLevel02::_allocate_l2(want, unit, max_alloc_size, hint, &allocated, extents)
        │
-       │  L2 层: 两轮扫描 [hint→end) + [0→hint)，跳过全 0 slot
+       │  L2 层：两轮扫描 [hint→end) + [0→hint)，跳过全 0 slot
        │
        ├─ 对每个非空 L2 bit:
        │    │
        │    ├─ AllocatorLevel01Loose::_allocate_l1(rem, unit, max_length, l1s, l1e, &allocated, extents)
        │    │    │
-       │    │    │  L1 层: 遍历 32 个 L1 条目 (1 个 uint64_t slot)
+       │    │    │  L1 层：遍历 32 个 L1 条目 (1 个 uint64_t slot)
        │    │    │
        │    │    ├─ L1_ENTRY_FULL  (00) → 跳过 (全分配)
        │    │    ├─ L1_ENTRY_FREE  (11) + 剩余 ≥ 整个 slotset → 整块分配，标记全 slotset
@@ -226,21 +229,21 @@ BitmapAllocator::allocate(want, unit, max_alloc_size, hint, extents)
        │    │         │
        │    │         └─ AllocatorLevel01Loose::_allocate_l0(rem, max_length, l0s, l0e, &allocated, extents)
        │    │              │
-       │    │              │  L0 层: 逐 uint64_t slot 扫描
+       │    │              │  L0 层：逐 uint64_t slot 扫描
        │    │              │
        │    │              ├─ slot == 0  (all_slot_clear) → 跳过
        │    │              ├─ slot == ~0 (all_slot_set)   → 取整个 slot (64 AU)
        │    │              └─ 否则 → 逐 bit 扫描 (find_next_set_bit / __builtin_ctzll)
        │    │                       找连续 1 bit 序列 → 确定连续空闲 AU
        │    │
-       │    │  找到连续空闲 AU 后:
+       │    │  找到连续空闲 AU 后：
        │    │    ├─ _fragment_and_emplace(): 合并相邻 extent，按 max_length 切片
        │    │    ├─ _mark_alloc_l0(): L0 对应 bit 清 0
        │    │    └─ 回到 L1 → _mark_l1_on_l0(): 若整个 slotset 变满 → L1 条目改 00
        │    │
        │    └─ 回 L2: 若对应的 L1 slotset 全空 (全部已分配) → L2 对应 bit 清 0
        │
-       └─ 分配完成后: available -= allocated
+       └─ 分配完成后：available -= allocated
            返回实际分配字节数 (或 -ENOSPC)
 ```
 
@@ -259,11 +262,11 @@ BitmapAllocator::release(release_set)
          │
          ├─ 1. AllocatorLevel01Loose::_free_l1(offset, length)
          │      │
-         │      ├─ L0 层: _mark_free_l0(l0_start, l0_end)
-         │      │    按 3 段式写入: 头部半 slot (bit 操作) → 中间整 slot (整字写入 ~0)
+         │      ├─ L0 层：_mark_free_l0(l0_start, l0_end)
+         │      │    按 3 段式写入：头部半 slot (bit 操作) → 中间整 slot (整字写入 ~0)
          │      │    → 尾部半 slot (bit 操作)
          │      │
-         │      └─ L1 层: _mark_l1_on_l0(l0_start_aligned, l0_end_aligned)
+         │      └─ L1 层：_mark_l1_on_l0(l0_start_aligned, l0_end_aligned)
          │            对每个受影响的 L0 slotset:
          │              - agg_and (AND 聚合): 全 1 才保持全空闲 (11)
          │              - agg_or  (OR 聚合):  全 0 才变成全分配 (00)
@@ -275,7 +278,7 @@ BitmapAllocator::release(release_set)
          └─ 3. available += released  (全局空闲计数器递增)
 ```
 
-**提取(claim-free)算法** (供 HybridAllocator 回收 bitmap 中空闲块到 AVL):
+**提取 (claim-free) 算法** (供 HybridAllocator 回收 bitmap 中空闲块到 AVL):
 
 ```plaintext
 AllocatorLevel02::claim_free_to_left(offset):
@@ -416,20 +419,26 @@ protected:
 
 ### 3.2 PExtentVector（物理 extent 容器）
 
-沿用已有 `bluestore_types.h` 中的定义（或 cxxlab 的等价类型）：
+使用 `blk/extent_types.h` 中定义的类型（Phase 0 重构后从 `bluestore/` 迁移到 `blk/`）：
 
 ```cpp
-struct bluestore_pextent_t {
+struct pextent_t {
     uint64_t offset = 0;
     uint32_t length = 0;
+
+    pextent_t() = default;
+    pextent_t(uint64_t o, uint32_t l) : offset(o), length(l) {}
 };
 
-using PExtentVector = std::vector<bluestore_pextent_t>;
+using PExtVector = std::vector<pextent_t>;
+
+// bluestore/bluestore_types.h 中通过别名引用：
+// using bluestore_pextent_t = pextent_t;
 ```
 
 ### 3.3 interval_set（区间容器）
 
-用于 release 接口。Ceph 使用 `interval_set<uint64_t>`，cxxlab 可复用已有的 `interval_set` 或 `std::map<uint64_t, uint64_t>`。
+用于 release 接口。Ceph 使用 `interval_set<uint64_t>`，cxxlab 复用 `blk/extent_types.h` 中定义的 `interval_set`。
 
 ## 4. 关键流程
 
@@ -502,7 +511,7 @@ close():
 | `AdminSocketHook` debug 接口 | 移除（ASok 调试钩子，非核心） |
 | `mempool` 内存监控 | 移除（仅统计用途） |
 | `cct->_conf` 配置读取 | 改用构造函数参数或全局配置结构体 |
-| `bluestore_types.h` 中 `bluestore_pextent_t` | cxxlab 中定义等价类型 |
+| `bluestore_types.h` 中 `bluestore_pextent_t` | 使用 `blk/extent_types.h` 中的等价类型（Phase 0 重构后迁移） |
 | ZonedAllocator / StupidAllocator | 不做移植 |
 | `_fragment_and_emplace` 中的 max_length 切片 | 保留（避免单 extent 过大） |
 | `get_fragmentation_score` 算法 | 保留基础实现，移除 clz 等平台相关问题（可用 `__builtin_clzll`） |
@@ -519,11 +528,11 @@ close():
 
 ### 5.4 依赖关系
 
-Allocator 依赖：
+Allocator 位于 `blk/` 目录（Phase 0 重构后从 `bluestore/` 迁移），依赖：
 
 - `common` 库: `bufferlist`、`cxxlab_assert`、`interval_set`、`intarith` 工具函数
+- `blk/extent_types.h`: `pextent_t`、`PExtentVector`、`interval_set`
 - 无 `kv` / `rocksdb` 依赖（只操作内存）
-- 无 `blk` 依赖
 
 ### 5.5 线程安全
 
@@ -564,5 +573,7 @@ mkfs 时：
 - Ceph source: `src/os/bluestore/HybridAllocator.h` / `.cc`
 - Ceph source: `src/os/bluestore/fastbmap_allocator_impl.h`（三级位图核心实现）
 - Ceph source: `src/os/bluestore/BlueStore.cc`（`_create_alloc`, `_init_alloc`, `_do_alloc_write`, `_txc_finalize_kv`, `_txc_release_alloc`）
-- 本项目的 `docs/design/freelist-manager.md`: FreelistManager 设计
-- 本项目的 `kv/key_value_db.h`: KV 抽象层
+- 本项目 [docs/design/overview.md](overview.md): 架构总览
+- 本项目 [docs/design/freelist-manager.md](freelist-manager.md): FreelistManager 设计
+- 本项目 `blk/extent_types.h`: pextent_t / PExtentVector / interval_set 定义
+- 本项目 `kv/key_value_db.h`: KV 抽象层
